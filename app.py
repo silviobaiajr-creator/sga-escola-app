@@ -100,17 +100,15 @@ def login():
                 users_df.columns = users_df.columns.str.strip()
 
                 # Verifica credenciais
-                # Converter para string e remover espaços extras
+                # Função robusta para limpar senhas (remove .0 de números interpretados como float pelo Google Sheets)
+                def clean_password(val):
+                    val_str = str(val).strip()
+                    if val_str.endswith('.0'):
+                        return val_str[:-2]
+                    return val_str
+
                 users_df['username'] = users_df['username'].astype(str).str.strip()
-                users_df['password'] = users_df['password'].astype(str).str.strip()
-                
-                # --- DEBUG TEMPORÁRIO (REMOVER DEPOIS) ---
-                with st.expander("🕵️‍♂️ Debug - O que o sistema está vendo?"):
-                    st.write("Colunas encontradas:", users_df.columns.tolist())
-                    st.write("Tabela de Usuários (Senhas visíveis para teste):")
-                    st.dataframe(users_df)
-                    st.write(f"Você digitou: User='{username}' | Pass='{password}'")
-                # ---------------------------------------------
+                users_df['password'] = users_df['password'].apply(clean_password)
                 
                 user = users_df[
                     (users_df["username"] == username.strip()) & 
