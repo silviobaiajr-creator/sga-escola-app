@@ -193,6 +193,9 @@ def admin_module():
                     m_id = st.text_input("Matrícula (ID Único)")
                 
                 m_turma = st.selectbox("Turma", options=turmas_ops)
+
+                # Checkbox para permitir atualização
+                update_existing = st.checkbox("Atualizar dados se a matrícula já existir?")
                 
                 submitted_manual = st.form_submit_button("Salvar Aluno")
                 
@@ -200,24 +203,58 @@ def admin_module():
                     if not m_nome or not m_id or not m_turma:
                         st.error("Preencha todos os campos!")
                     else:
-                        # VERIFICAÇÃO DE DUPLICIDADE (MATRÍCULA)
                         current_students = get_data("students")
                         
-                        # Limpar IDs para comparar strings
-                        existing_ids = set()
-                        if not current_students.empty:
-                             existing_ids = set(current_students['student_id'].astype(str).str.strip())
+                        # Função de limpeza de ID (mesma lógica da senha para evitar erro 1000.0 != 1000)
+                        def clean_id(val):
+                            val_str = str(val).strip()
+                            if val_str.endswith('.0'):
+                                return val_str[:-2]
+                            return val_str
+
+                        # Preparar ID de entrada
+                        input_id_clean = clean_id(m_id)
                         
-                        if m_id.strip() in existing_ids:
-                            st.error(f"⛔ Erro: A matrícula '{m_id}' JÁ EXISTE no sistema! Não é possível cadastrar duas vezes.")
+                        # Verificar duplicidade
+                        if not current_students.empty:
+                             # Criar coluna limpa temporária para comparação
+                             current_students['id_clean'] = current_students['student_id'].apply(clean_id)
+                             existing_ids = set(current_students['id_clean'])
                         else:
-                            # Tudo certo, salvar
+                             existing_ids = set()
+                        
+                        if input_id_clean in existing_ids:
+                            if update_existing:
+                                # Lógica de Atualização (Sobrescrever)
+                                # Encontrar o índice da linha que tem esse ID
+                                idx_to_update = current_students.index[current_students['id_clean'] == input_id_clean].tolist()
+                                
+                                # Atualizar dados (nome e turma)
+                                for idx in idx_to_update:
+                                    current_students.at[idx, 'student_name'] = m_nome.strip()
+                                    current_students.at[idx, 'class_name'] = m_turma
+                                
+                                # Remover coluna temp antes de salvar
+                                if 'id_clean' in current_students.columns:
+                                    current_students = current_students.drop(columns=['id_clean'])
+                                    
+                                save_data(current_students, "students")
+                                st.success(f"Cadastro do aluno {m_nome} (ID {input_id_clean}) ATUALIZADO com sucesso!")
+                            else:
+                                # Bloquear
+                                st.error(f"⛔ A matrícula '{input_id_clean}' JÁ EXISTE! Marque a caixa 'Atualizar dados...' se deseja sobrescrever.")
+                        else:
+                            # Tudo certo, salvar novo
                             new_student = pd.DataFrame([{
-                                "student_id": m_id.strip(),
+                                "student_id": input_id_clean, # Salvar o ID limpo
                                 "student_name": m_nome.strip(),
                                 "class_name": m_turma
                             }])
                             
+                            # Remover coluna temp se existir no current antes do concat
+                            if 'id_clean' in current_students.columns:
+                                current_students = current_students.drop(columns=['id_clean'])
+
                             updated_students = pd.concat([current_students, new_student], ignore_index=True)
                             save_data(updated_students, "students")
                             st.success(f"Aluno {m_nome} cadastrado com sucesso na turma {m_turma}!")
