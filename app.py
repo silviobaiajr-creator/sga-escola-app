@@ -96,10 +96,21 @@ def login():
                     st.error("Tabela de usuários não encontrada ou vazia.")
                     return
 
+                # LIMPEZA DE COLUNAS (Remover espaços nos cabeçalhos)
+                users_df.columns = users_df.columns.str.strip()
+
                 # Verifica credenciais
-                # Converter para string e remover espaços extras (correção para erro de int vs str)
+                # Converter para string e remover espaços extras
                 users_df['username'] = users_df['username'].astype(str).str.strip()
                 users_df['password'] = users_df['password'].astype(str).str.strip()
+                
+                # --- DEBUG TEMPORÁRIO (REMOVER DEPOIS) ---
+                with st.expander("🕵️‍♂️ Debug - O que o sistema está vendo?"):
+                    st.write("Colunas encontradas:", users_df.columns.tolist())
+                    st.write("Tabela de Usuários (Senhas visíveis para teste):")
+                    st.dataframe(users_df)
+                    st.write(f"Você digitou: User='{username}' | Pass='{password}'")
+                # ---------------------------------------------
                 
                 user = users_df[
                     (users_df["username"] == username.strip()) & 
