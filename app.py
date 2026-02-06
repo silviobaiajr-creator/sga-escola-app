@@ -97,9 +97,13 @@ def login():
                     return
 
                 # Verifica credenciais
+                # Converter para string e remover espaços extras (correção para erro de int vs str)
+                users_df['username'] = users_df['username'].astype(str).str.strip()
+                users_df['password'] = users_df['password'].astype(str).str.strip()
+                
                 user = users_df[
-                    (users_df["username"] == username) & 
-                    (users_df["password"] == password)
+                    (users_df["username"] == username.strip()) & 
+                    (users_df["password"] == password.strip())
                 ]
 
                 if not user.empty:
