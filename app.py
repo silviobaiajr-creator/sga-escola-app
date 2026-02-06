@@ -165,60 +165,117 @@ def admin_module():
     
     tab1, tab2 = st.tabs(["📤 Upload de Alunos", "📊 Dashboards Analíticos"])
     
-    # --- ABA 1: UPLOAD DE ALUNOS ---
+    # --- ABA 1: GESTÃO DE ALUNOS ---
     with tab1:
-        st.subheader("Cadastro em Lote de Alunos")
-        st.info("O CSV deve conter as colunas: student_id, student_name, class_name")
+        st.subheader("Cadastro de Alunos")
         
-        uploaded_file = st.file_uploader("Carregar arquivo CSV", type=["csv"])
-        
-        if uploaded_file:
-            try:
-                df_upload = pd.read_csv(uploaded_file)
-                
-                # Validação de Colunas
-                required_cols = {'student_id', 'student_name', 'class_name'}
-                if not required_cols.issubset(df_upload.columns):
-                    st.error(f"O CSV deve conter as colunas: {required_cols}")
-                else:
-                    # 3.A. VALIDAÇÃO CRUZADA COM setup_classes
-                    setup_df = get_data("setup_classes")
-                    if setup_df.empty:
-                        st.error("Aba 'setup_classes' está vazia! Configure as turmas antes de importar alunos.")
-                        return
+        tipo_cadastro = st.radio("Selecione o método:", ["📂 Upload via CSV", "✍️ Cadastro Manual"], horizontal=True)
 
-                    valid_classes = set(setup_df["class_name"].unique())
-                    uploaded_classes = set(df_upload["class_name"].unique())
-                    
-                    invalid_classes = uploaded_classes - valid_classes
-                    
-                    if invalid_classes:
-                        st.error(f"❌ Upload Bloqueado! Turmas não cadastradas encontradas: {invalid_classes}")
-                        st.warning(f"Turmas permitidas (conforme setup_classes): {sorted(list(valid_classes))}")
+        # ---------------------------------------------------------
+        # OPÇÃO A: CADASTRO MANUAL NOVO
+        # ---------------------------------------------------------
+        if tipo_cadastro == "✍️ Cadastro Manual":
+            with st.form("form_aluno_manual"):
+                st.markdown("### Novo Aluno")
+                
+                # Carregar turmas para o seletor
+                setup_df = get_data("setup_classes")
+                if setup_df.empty:
+                    st.error("Configure as turmas em setup_classes primeiro!")
+                    turmas_ops = []
+                else:
+                    turmas_ops = setup_df["class_name"].unique().tolist()
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    m_nome = st.text_input("Nome Completo")
+                with c2:
+                    m_id = st.text_input("Matrícula (ID Único)")
+                
+                m_turma = st.selectbox("Turma", options=turmas_ops)
+                
+                submitted_manual = st.form_submit_button("Salvar Aluno")
+                
+                if submitted_manual:
+                    if not m_nome or not m_id or not m_turma:
+                        st.error("Preencha todos os campos!")
                     else:
-                        st.success("✅ Validação de turmas aprovada!")
-                        st.dataframe(df_upload.head())
+                        # VERIFICAÇÃO DE DUPLICIDADE (MATRÍCULA)
+                        current_students = get_data("students")
                         
-                        if st.button("Confirmar Importação"):
-                            # Lógica para adicionar (Append) sem duplicar matrículas seria ideal,
-                            # mas o requisito pede Append/Salvar. Vamos carregar o atual e concatenar.
-                            current_students = get_data("students")
+                        # Limpar IDs para comparar strings
+                        existing_ids = set()
+                        if not current_students.empty:
+                             existing_ids = set(current_students['student_id'].astype(str).str.strip())
+                        
+                        if m_id.strip() in existing_ids:
+                            st.error(f"⛔ Erro: A matrícula '{m_id}' JÁ EXISTE no sistema! Não é possível cadastrar duas vezes.")
+                        else:
+                            # Tudo certo, salvar
+                            new_student = pd.DataFrame([{
+                                "student_id": m_id.strip(),
+                                "student_name": m_nome.strip(),
+                                "class_name": m_turma
+                            }])
                             
-                            # Evitar duplicidade de matrícula (regra extra de integridade)
-                            if not current_students.empty:
-                                existing_ids = set(current_students['student_id'].astype(str))
-                                new_ids = set(df_upload['student_id'].astype(str))
-                                
-                                overlap = existing_ids.intersection(new_ids)
-                                if overlap:
-                                    st.warning(f"Atenção: {len(overlap)} matrículas já existem e serão duplicadas se prosseguir. Considere limpar antes.")
-                            
-                            # Concatenar
-                            updated_students = pd.concat([current_students, df_upload], ignore_index=True)
+                            updated_students = pd.concat([current_students, new_student], ignore_index=True)
                             save_data(updated_students, "students")
+                            st.success(f"Aluno {m_nome} cadastrado com sucesso na turma {m_turma}!")
+
+        # ---------------------------------------------------------
+        # OPÇÃO B: UPLOAD CSV (LÓGICA EXISTENTE)
+        # ---------------------------------------------------------
+        elif tipo_cadastro == "📂 Upload via CSV":
+            st.info("O CSV deve conter as colunas: student_id, student_name, class_name")
             
-            except Exception as e:
-                st.error(f"Erro ao processar CSV: {e}")
+            uploaded_file = st.file_uploader("Carregar arquivo CSV", type=["csv"])
+            
+            if uploaded_file:
+                try:
+                    df_upload = pd.read_csv(uploaded_file)
+                    
+                    # Validação de Colunas
+                    required_cols = {'student_id', 'student_name', 'class_name'}
+                    if not required_cols.issubset(df_upload.columns):
+                        st.error(f"O CSV deve conter as colunas: {required_cols}")
+                    else:
+                        # 3.A. VALIDAÇÃO CRUZADA COM setup_classes
+                        setup_df = get_data("setup_classes")
+                        if setup_df.empty:
+                            st.error("Aba 'setup_classes' está vazia! Configure as turmas antes de importar alunos.")
+                        else:
+                            valid_classes = set(setup_df["class_name"].unique())
+                            uploaded_classes = set(df_upload["class_name"].unique())
+                            
+                            invalid_classes = uploaded_classes - valid_classes
+                            
+                            if invalid_classes:
+                                st.error(f"❌ Upload Bloqueado! Turmas não cadastradas encontradas: {invalid_classes}")
+                                st.warning(f"Turmas permitidas (conforme setup_classes): {sorted(list(valid_classes))}")
+                            else:
+                                st.success("✅ Validação de turmas aprovada!")
+                                st.dataframe(df_upload.head())
+                                
+                                if st.button("Confirmar Importação"):
+                                    # Lógica para adicionar (Append) sem duplicar matrículas seria ideal,
+                                    # mas o requisito pede Append/Salvar. Vamos carregar o atual e concatenar.
+                                    current_students = get_data("students")
+                                    
+                                    # Evitar duplicidade de matrícula (regra extra de integridade)
+                                    if not current_students.empty:
+                                        existing_ids = set(current_students['student_id'].astype(str))
+                                        new_ids = set(df_upload['student_id'].astype(str))
+                                        
+                                        overlap = existing_ids.intersection(new_ids)
+                                        if overlap:
+                                            st.warning(f"Atenção: {len(overlap)} matrículas já existem e serão duplicadas se prosseguir. Considere limpar antes.")
+                                    
+                                    # Concatenar
+                                    updated_students = pd.concat([current_students, df_upload], ignore_index=True)
+                                    save_data(updated_students, "students")
+                
+                except Exception as e:
+                    st.error(f"Erro ao processar CSV: {e}")
 
     # --- ABA 2: DASHBOARDS ANALÍTICOS ---
     with tab2:
