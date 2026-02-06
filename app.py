@@ -50,7 +50,8 @@ def get_data(worksheet_name):
     except Exception as e:
         # Se a aba não existir, tenta criar (embora o correto seja o admin criar a planilha base)
         # Aqui vamos apenas retornar vazio ou erro amigável
-        st.warning(f"Aba '{worksheet_name}' não encontrada ou vazia. Verifique a planilha.")
+        st.error(f"Erro ao ler aba '{worksheet_name}': {e}")
+        # st.warning(f"Aba '{worksheet_name}' não encontrada ou vazia. Verifique a planilha.")
         # Retorna DataFrame vazio com colunas esperadas para evitar crash
         return pd.DataFrame()
 
