@@ -413,18 +413,40 @@ def teacher_module(user_info):
 
     # --- ABA 2: AVALIAÇÃO CONTÍNUA ---
     with tab2:
-        # Layout compacto para filtros
-        cf1, cf2 = st.columns(2)
+        # ---------------------------------------------------------
+        # 1. SELETORES DE CONTEXTO (TURMA E DISCIPLINA)
+        # ---------------------------------------------------------
+        cf1, cf2, cf3 = st.columns([1, 1, 2])
+        
+        # A. Turma
         with cf1:
             allowed_classes = [c.strip() for c in str(user_info.get('allowed_classes', '')).split(',')]
             selected_class = st.selectbox("Turma", allowed_classes)
         
+        # B. Disciplina (NOVO)
         with cf2:
+            # Pega string de disciplinas e quebra por vírgula
+            raw_disciplines = str(user_info.get('disciplina', '')).split(',')
+            allowed_disciplines = [d.strip() for d in raw_disciplines if d.strip()]
+            
+            if not allowed_disciplines:
+                # Fallback se não tiver nada cadastrado
+                allowed_disciplines = ["Geral"]
+            
+            selected_discipline = st.selectbox("Disciplina", allowed_disciplines)
+
+        # C. Habilidade
+        with cf3:
             rubrics_df = get_data("teacher_rubrics")
-            my_rubrics = rubrics_df[rubrics_df['teacher_username'] == user_info['username']]
+            if rubrics_df.empty:
+                 my_rubrics = pd.DataFrame()
+            else:
+                 my_rubrics = rubrics_df[rubrics_df['teacher_username'] == user_info['username']]
+            
             if my_rubrics.empty:
-                st.warning("Sem rubricas.")
+                st.warning("Sem rubricas cadastradas.")
                 rubric_options = []
+                selected_skill = None
             else:
                 rubric_options = my_rubrics['bncc_code'].unique()
                 selected_skill = st.selectbox("Habilidade", rubric_options, key="assess_skill_sel")
@@ -441,11 +463,14 @@ def teacher_module(user_info):
 
             # Grid de Alunos
             students_df = get_data("students")
-            class_students = students_df[students_df['class_name'] == selected_class]
+            if students_df.empty:
+                class_students = pd.DataFrame()
+            else:
+                class_students = students_df[students_df['class_name'] == selected_class]
             
             if not class_students.empty:
                 with st.form("assessment_form"):
-                    st.write(f"Avaliando: **{selected_class}** - **{selected_skill}**")
+                    st.write(f"Avaliando: **{selected_class}** - **{selected_discipline}** - **{selected_skill}**")
                     
                     grades = {}
                     
@@ -462,22 +487,22 @@ def teacher_module(user_info):
                                 options=["1", "2", "3", "4"],
                                 horizontal=True,
                                 key=f"grade_{row['student_id']}",
-                                label_visibility="collapsed" # Esconde o label "Nível" para limpar visual
+                                label_visibility="collapsed"
                             )
                         st.divider()
                     
                     c_date, c_bim, c_sub = st.columns([1, 1, 1])
                     with c_date:
-                        data_ref = st.date_input("Data", datetime.now())
+                        # 4. Data DD/MM/AAAA
+                        data_ref = st.date_input("Data", datetime.now(), format="DD/MM/YYYY")
                     with c_bim:
                         bimester = st.selectbox("Bimestre", ["1º", "2º", "3º", "4º"])
                     with c_sub:
-                        st.write("") # Espaço
+                        st.write("") 
                         st.write("") 
                         submit_grades = st.form_submit_button("💾 Salvar Tudo", use_container_width=True)
                     
                     if submit_grades:
-                        # ... (Lógica de salvamento existente) ...
                         new_assessments = []
                         timestamp = datetime.now().isoformat()
                         for student_id, level in grades.items():
@@ -486,6 +511,7 @@ def teacher_module(user_info):
                                 "date": data_ref,
                                 "bimester_ref": bimester,
                                 "teacher": user_info['username'],
+                                "discipline": selected_discipline, # Campo novo
                                 "class_name": selected_class,
                                 "student_id": student_id,
                                 "bncc_code": selected_skill,
@@ -493,9 +519,13 @@ def teacher_module(user_info):
                             })
                         df_new = pd.DataFrame(new_assessments)
                         current_assessments = get_data("assessments")
+                        
+                        # Garantir que assessment tenha coluna discipline se não tiver
+                        if not current_assessments.empty and 'discipline' not in current_assessments.columns:
+                            current_assessments['discipline'] = 'Geral'
+
                         df_updated = pd.concat([current_assessments, df_new], ignore_index=True)
                         save_data(df_updated, "assessments")
-
     # --- ABA 3: RELATÓRIOS ---
     with tab3:
         all_assessments = get_data("assessments")
