@@ -511,11 +511,18 @@ def teacher_module(user_info):
             # FILTRO RELACIONAL: Mostrar apenas rubricas da DISCIPLINA selecionada
             # Precisamos cruzar com a BNCC Library para sber a disciplina da habilidade
             bncc_ref = get_data("bncc_library")
-            if not bncc_ref.empty and 'discipline' in bncc_ref.columns:
+            
+            # Validação de Colunas para evitar KeyError
+            if not bncc_ref.empty and 'discipline' in bncc_ref.columns and 'code' in bncc_ref.columns:
                 # Merge para trazer a disciplina
                 my_rubrics = my_rubrics.merge(bncc_ref[['code', 'discipline']], left_on='bncc_code', right_on='code', how='left')
                 # Filtrar
-                my_rubrics = my_rubrics[my_rubrics['discipline'] == selected_discipline]
+                if 'discipline' in my_rubrics.columns:
+                    my_rubrics = my_rubrics[my_rubrics['discipline'] == selected_discipline]
+            else:
+                # Se não tiver a coluna, não filtra (ou avisa)
+                # st.warning("Coluna 'discipline' não encontrada na BNCC Library.")
+                pass
             
             if my_rubrics.empty:
                 st.warning(f"Sem rubricas para {selected_discipline}.")
