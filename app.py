@@ -564,6 +564,9 @@ def teacher_module(user_info):
             if df_turma.empty:
                 st.warning(f"Sem avaliações para {class_filter} na disciplina {disc_filter}.")
             else:
+                # Garantir tipos para merge e filtros
+                df_turma['student_id'] = df_turma['student_id'].astype(str)
+                
                 # Processar dados
                 df_final = calcular_notas(df_turma)
                 df_final['level_numeric'] = pd.to_numeric(df_final['level_assigned'], errors='coerce')
