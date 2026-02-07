@@ -512,16 +512,31 @@ def teacher_module(user_info):
             # Precisamos cruzar com a BNCC Library para sber a disciplina da habilidade
             bncc_ref = get_data("bncc_library")
             
-            # Validação de Colunas para evitar KeyError
-            if not bncc_ref.empty and 'discipline' in bncc_ref.columns and 'code' in bncc_ref.columns:
+            # Validação e Limpeza de Colunas para evitar KeyError
+            if not bncc_ref.empty:
+                bncc_ref.columns = bncc_ref.columns.str.strip() # Remove espaços extras
+            
+            if not my_rubrics.empty:
+                 my_rubrics.columns = my_rubrics.columns.str.strip()
+
+            # Verificar se as colunas chaves existem em ambos os lados
+            has_bncc_cols = not bncc_ref.empty and 'discipline' in bncc_ref.columns and 'code' in bncc_ref.columns
+            has_rubric_cols = not my_rubrics.empty and 'bncc_code' in my_rubrics.columns
+
+            if has_bncc_cols and has_rubric_cols:
                 # Merge para trazer a disciplina
+                # Garantir tipos iguais
+                bncc_ref['code'] = bncc_ref['code'].astype(str).str.strip()
+                my_rubrics['bncc_code'] = my_rubrics['bncc_code'].astype(str).str.strip()
+
                 my_rubrics = my_rubrics.merge(bncc_ref[['code', 'discipline']], left_on='bncc_code', right_on='code', how='left')
+                
                 # Filtrar
                 if 'discipline' in my_rubrics.columns:
                     my_rubrics = my_rubrics[my_rubrics['discipline'] == selected_discipline]
             else:
-                # Se não tiver a coluna, não filtra (ou avisa)
-                # st.warning("Coluna 'discipline' não encontrada na BNCC Library.")
+                # Fallback: Se não conseguir filtrar, mostra aviso mas não quebra
+                # st.warning("Não foi possível filtrar por disciplina devido a incompatibilidade na planilha.")
                 pass
             
             if my_rubrics.empty:
