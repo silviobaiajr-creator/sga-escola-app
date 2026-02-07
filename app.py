@@ -86,10 +86,14 @@ def login():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown("<h1 style='text-align: center;'>🔐 Login SGA-H</h1>", unsafe_allow_html=True)
-            username = st.text_input("Usuário")
-            password = st.text_input("Senha", type="password")
             
-            if st.button("Entrar", use_container_width=True):
+            # 5. Correção do ENTER: Usando st.form
+            with st.form("login_form"):
+                username = st.text_input("Usuário / CPF") # 1. Sugestão de Label
+                password = st.text_input("Senha", type="password")
+                submit_login = st.form_submit_button("Entrar", use_container_width=True)
+            
+            if submit_login:
                 users_df = get_data("users")
                 
                 if users_df.empty:
@@ -100,19 +104,19 @@ def login():
                 users_df.columns = users_df.columns.str.strip()
 
                 # Verifica credenciais
-                # Função robusta para limpar senhas (remove .0 de números interpretados como float pelo Google Sheets)
-                def clean_password(val):
+                # Função robusta para limpar senhas
+                def clean_val(val):
                     val_str = str(val).strip()
                     if val_str.endswith('.0'):
                         return val_str[:-2]
                     return val_str
 
-                users_df['username'] = users_df['username'].astype(str).str.strip()
-                users_df['password'] = users_df['password'].apply(clean_password)
+                users_df['username'] = users_df['username'].apply(clean_val)
+                users_df['password'] = users_df['password'].apply(clean_val)
                 
                 user = users_df[
-                    (users_df["username"] == username.strip()) & 
-                    (users_df["password"] == password.strip())
+                    (users_df["username"] == clean_val(username)) & 
+                    (users_df["password"] == clean_val(password))
                 ]
 
                 if not user.empty:
@@ -350,29 +354,43 @@ def admin_module():
 
 
 def teacher_module(user_info):
-    st.title(f"🍎 Área do Professor: {user_info['name']}")
+    # 3. Layout Otimizado: Header compacto
+    c_head1, c_head2 = st.columns([3, 1])
+    with c_head1:
+        st.markdown(f"### 🍎 Professor: **{user_info['name']}**")
+    with c_head2:
+        if st.button("Sair", key="logout_btn_top"):
+            st.session_state["logged_in"] = False
+            st.rerun()
     
-    tab1, tab2, tab3 = st.tabs(["📝 Planejamento (Rubricas)", "✅ Avaliação Contínua", "📊 Relatórios Turma"])
+    st.divider() # Linha sutil para separar header
+    
+    tab1, tab2, tab3 = st.tabs(["📝 Planejamento", "✅ Avaliação", "📊 Relatórios"])
     
     # --- ABA 1: PLANEJAMENTO ---
     with tab1:
-        st.subheader("Cadastro de Rubricas de Avaliação")
-        
         bncc_df = get_data("bncc_library")
         if bncc_df.empty:
             st.warning("Biblioteca BNCC vazia.")
         else:
             # Seleção de Habilidade
-            bncc_options = bncc_df['code'] + " - " + bncc_df['description'].str[:50] + "..."
+            bncc_options = bncc_df['code'] + " - " + bncc_df['description'].str[:30] + "..."
             selected_bncc_str = st.selectbox("Selecione a Habilidade (BNCC)", bncc_options)
             selected_code = selected_bncc_str.split(" - ")[0]
             
+            # 7. Exibir Descrição Completa
+            full_desc = bncc_df[bncc_df['code'] == selected_code]['description'].values[0]
+            st.info(f"📄 **Descrição:** {full_desc}")
+            
             with st.form("rubric_form"):
                 st.markdown(f"**Defina os critérios para: {selected_code}**")
-                l1 = st.text_area("Nível 1 (Iniciante)", placeholder="O aluno não consegue...")
-                l2 = st.text_area("Nível 2 (Básico)", placeholder="O aluno consegue parcialmente...")
-                l3 = st.text_area("Nível 3 (Proficiente)", placeholder="O aluno realiza com autonomia...")
-                l4 = st.text_area("Nível 4 (Avançado)", placeholder="O aluno domina e conecta...")
+                c_rub1, c_rub2 = st.columns(2)
+                with c_rub1:
+                    l1 = st.text_area("Nível 1 (Iniciante)", height=100)
+                    l2 = st.text_area("Nível 2 (Básico)", height=100)
+                with c_rub2:
+                    l3 = st.text_area("Nível 3 (Proficiente)", height=100)
+                    l4 = st.text_area("Nível 4 (Avançado)", height=100)
                 
                 submitted = st.form_submit_button("Salvar Rubrica")
                 if submitted:
@@ -395,67 +413,73 @@ def teacher_module(user_info):
 
     # --- ABA 2: AVALIAÇÃO CONTÍNUA ---
     with tab2:
-        st.subheader("Lançamento de Avaliações")
+        # Layout compacto para filtros
+        cf1, cf2 = st.columns(2)
+        with cf1:
+            allowed_classes = [c.strip() for c in str(user_info.get('allowed_classes', '')).split(',')]
+            selected_class = st.selectbox("Turma", allowed_classes)
         
-        # 4.B. Seletores Filtados
-        allowed_classes = [c.strip() for c in str(user_info.get('allowed_classes', '')).split(',')]
-        selected_class = st.selectbox("Selecione a Turma", allowed_classes)
+        with cf2:
+            rubrics_df = get_data("teacher_rubrics")
+            my_rubrics = rubrics_df[rubrics_df['teacher_username'] == user_info['username']]
+            if my_rubrics.empty:
+                st.warning("Sem rubricas.")
+                rubric_options = []
+            else:
+                rubric_options = my_rubrics['bncc_code'].unique()
+                selected_skill = st.selectbox("Habilidade", rubric_options)
         
-        # Filtrar rubricas do professor
-        rubrics_df = get_data("teacher_rubrics")
-        my_rubrics = rubrics_df[rubrics_df['teacher_username'] == user_info['username']]
-        
-        if my_rubrics.empty:
-            st.info("Você ainda não cadastrou rubricas. Vá para a aba Planejamento.")
-        else:
-            rubric_options = my_rubrics['bncc_code'].unique()
-            selected_skill = st.selectbox("Habilidade para Avaliar", rubric_options)
-            
-            # Visualizar Rubrica Atual
+        if not my_rubrics.empty and selected_skill:
+             # Visualizar Rubrica Atual (Expander para economizar espaço)
             current_rubric = my_rubrics[my_rubrics['bncc_code'] == selected_skill].iloc[0]
-            st.info(
-                f"**Guia de Correção:**\n\n"
-                f"1️⃣ {current_rubric['desc_level_1']}\n\n"
-                f"2️⃣ {current_rubric['desc_level_2']}\n\n"
-                f"3️⃣ {current_rubric['desc_level_3']}\n\n"
-                f"4️⃣ {current_rubric['desc_level_4']}"
-            )
-            
+            with st.expander("📖 Ver Guia de Correção (Rubrica)", expanded=False):
+                st.markdown(f"""
+                | Nível 1 | Nível 2 | Nível 3 | Nível 4 |
+                |---|---|---|---|
+                | {current_rubric['desc_level_1']} | {current_rubric['desc_level_2']} | {current_rubric['desc_level_3']} | {current_rubric['desc_level_4']} |
+                """)
+
             # Grid de Alunos
             students_df = get_data("students")
             class_students = students_df[students_df['class_name'] == selected_class]
             
-            if class_students.empty:
-                st.warning(f"Nenhum aluno encontrado na turma {selected_class}.")
-            else:
+            if not class_students.empty:
                 with st.form("assessment_form"):
-                    st.write(f"Avaliando turma **{selected_class}** em **{selected_skill}**")
+                    st.write(f"Avaliando: **{selected_class}** - **{selected_skill}**")
                     
-                    # Dicionário para guardar as notas
                     grades = {}
                     
-                    # Iterar alunos
+                    # Tabela mais compacta
                     for index, row in class_students.iterrows():
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            st.write(f"👤 {row['student_name']} ({row['student_id']})")
-                        with col2:
-                            grades[row['student_id']] = st.select_slider(
+                        c_alu, c_nota = st.columns([2, 3])
+                        with c_alu:
+                            st.write(f"**{row['student_name']}**")
+                            st.caption(f"ID: {row['student_id']}")
+                        with c_nota:
+                            # 4. Input Otimizado: Radio horizontal
+                            grades[row['student_id']] = st.radio(
                                 "Nível", 
-                                options=["1", "2", "3", "4"], 
-                                key=f"grade_{row['student_id']}"
+                                options=["1", "2", "3", "4"],
+                                horizontal=True,
+                                key=f"grade_{row['student_id']}",
+                                label_visibility="collapsed" # Esconde o label "Nível" para limpar visual
                             )
                         st.divider()
                     
-                    data_ref = st.date_input("Data da Avaliação", datetime.now())
-                    bimester = st.selectbox("Bimestre", ["1º", "2º", "3º", "4º"])
-                    
-                    submit_grades = st.form_submit_button("💾 Salvar Avaliações")
+                    c_date, c_bim, c_sub = st.columns([1, 1, 1])
+                    with c_date:
+                        data_ref = st.date_input("Data", datetime.now())
+                    with c_bim:
+                        bimester = st.selectbox("Bimestre", ["1º", "2º", "3º", "4º"])
+                    with c_sub:
+                        st.write("") # Espaço
+                        st.write("") 
+                        submit_grades = st.form_submit_button("💾 Salvar Tudo", use_container_width=True)
                     
                     if submit_grades:
+                        # ... (Lógica de salvamento existente) ...
                         new_assessments = []
                         timestamp = datetime.now().isoformat()
-                        
                         for student_id, level in grades.items():
                             new_assessments.append({
                                 "timestamp": timestamp,
@@ -467,89 +491,76 @@ def teacher_module(user_info):
                                 "bncc_code": selected_skill,
                                 "level_assigned": level
                             })
-                        
                         df_new = pd.DataFrame(new_assessments)
                         current_assessments = get_data("assessments")
-                        
-                        # 4.B. Lógica de Salvamento (APPEND)
                         df_updated = pd.concat([current_assessments, df_new], ignore_index=True)
                         save_data(df_updated, "assessments")
 
-    # --- ABA 3: RELATÓRIOS (BI EDUCACIONAL) ---
+    # --- ABA 3: RELATÓRIOS ---
     with tab3:
-        st.subheader("Inteligência de Dados")
-        
         all_assessments = get_data("assessments")
-        # Filtrar apenas dados desta turma (para simplificar visualização)
         class_assessments = all_assessments[all_assessments['class_name'].isin(allowed_classes)]
         
         if class_assessments.empty:
-            st.info("Sem dados suficientes para gráficos.")
+            st.info("Sem dados.")
         else:
-            # Heatmap da Turma
-            st.markdown("### 🔥 Mapa de Calor da Turma")
-            class_filter = st.selectbox("Filtrar Turma para Heatmap", allowed_classes, key="heatmap_class")
+             # Filtro Global da Aba
+            class_filter = st.selectbox("Turma para Análise", allowed_classes, key="rep_class")
+            df_turma = class_assessments[class_assessments['class_name'] == class_filter]
             
-            heatmap_data = class_assessments[class_assessments['class_name'] == class_filter]
+            # Processar dados
+            df_final = calcular_notas(df_turma)
+            df_final['level_numeric'] = pd.to_numeric(df_final['level_assigned'], errors='coerce')
+
+            tab_g1, tab_g2 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução"])
             
-            # Pegar situação mais recente
-            heatmap_data = calcular_notas(heatmap_data)
+            with tab_g1:
+                # Heatmap existente
+                if not df_final.empty:
+                    pivot = df_final.pivot_table(index='student_id', columns='bncc_code', values='level_numeric', aggfunc='max')
+                    fig_heat = px.imshow(pivot, color_continuous_scale='RdYlGn', zmin=1, zmax=4, text_auto=True, title="Nível Atual por Habilidade")
+                    st.plotly_chart(fig_heat, use_container_width=True)
             
-            if not heatmap_data.empty:
-                # Pivot: Index=Aluno, Columns=Habilidade, Values=Nível
-                # Precisamos garantir que Nível seja numérico
-                heatmap_data['level_numeric'] = pd.to_numeric(heatmap_data['level_assigned'], errors='coerce')
+            with tab_g2:
+                # 2. Evolução Geral (Média da Turma ou Média do Aluno)
+                vis_type = st.radio("Visualizar:", ["Individual (Por Habilidade)", "Geral do Aluno (Média Todas Habilidades)"], horizontal=True)
                 
-                pivot = heatmap_data.pivot_table(
-                    index='student_id', 
-                    columns='bncc_code', 
-                    values='level_numeric',
-                    aggfunc='max' # Só para garantir unicidade, já tratada antes
-                )
+                if vis_type == "Individual (Por Habilidade)":
+                    # Gráfico existente
+                    c_sel1, c_sel2 = st.columns(2)
+                    with c_sel1:
+                        student_sel = st.selectbox("Aluno", df_turma['student_id'].unique())
+                    with c_sel2:
+                        skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique())
+                    
+                    evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
+                    if not evo_df.empty:
+                        fig = px.line(evo_df, x='date', y=pd.to_numeric(evo_df['level_assigned']), markers=True, title=f"Evolução: {skill_sel}")
+                        fig.update_yaxes(range=[0.5, 4.5], tickvals=[1,2,3,4])
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Nenhum histórico encontrado para este aluno nesta habilidade.")
                 
-                fig_heat = px.imshow(
-                    pivot, 
-                    color_continuous_scale=['red', 'orange', 'yellow', 'green'],
-                    zmin=1, zmax=4,
-                    text_auto=True,
-                    aspect="auto",
-                    title=f"Desempenho por Habilidade - {class_filter}"
-                )
-                st.plotly_chart(fig_heat, use_container_width=True)
-            else:
-                st.warning("Sem dados processados para esta turma.")
-            
-            # Gráfico de Evolução Individual
-            st.markdown("### 📈 Evolução Individual")
-            
-            col_sel1, col_sel2 = st.columns(2)
-            with col_sel1:
-                student_sel = st.selectbox("Aluno", class_assessments['student_id'].unique())
-            with col_sel2:
-                skill_sel = st.selectbox("Habilidade", class_assessments['bncc_code'].unique())
-            
-            evolution_df = class_assessments[
-                (class_assessments['student_id'] == student_sel) & 
-                (class_assessments['bncc_code'] == skill_sel)
-            ].copy()
-            
-            if not evolution_df.empty:
-                evolution_df['date'] = pd.to_datetime(evolution_df['date'])
-                evolution_df['level_numeric'] = pd.to_numeric(evolution_df['level_assigned'])
-                evolution_df = evolution_df.sort_values(by='date')
-                
-                fig_line = px.line(
-                    evolution_df, 
-                    x='date', 
-                    y='level_numeric', 
-                    markers=True,
-                    range_y=[0.5, 4.5],
-                    title=f"Trajetória de Aprendizagem: {student_sel}"
-                )
-                fig_line.update_yaxes(tickvals=[1, 2, 3, 4], ticktext=["1-Iniciante", "2-Básico", "3-Proficiente", "4-Avançado"])
-                st.plotly_chart(fig_line, use_container_width=True)
-            else:
-                st.info("Nenhum histórico encontrado para este aluno nesta habilidade.")
+                else:
+                    # Nova funcionalidade: Média Geral do Aluno ao longo do tempo
+                    student_sel_g = st.selectbox("Selecione o Aluno", df_turma['student_id'].unique(), key="st_gen")
+                    
+                    # Filtrar aluno
+                    df_student = df_turma[df_turma['student_id'] == student_sel_g].copy()
+                    df_student['date'] = pd.to_datetime(df_student['date'])
+                    df_student['level_numeric'] = pd.to_numeric(df_student['level_assigned'])
+                    
+                    # Agrupar por data (Média de todas as habilidades avaliadas naquele dia/período)
+                    # Para ser mais justo, calculamos a média ACUMULADA. Mas simplificado: Média por dia de avaliação.
+                    df_grouped = df_student.groupby('date')['level_numeric'].mean().reset_index()
+                    
+                    if not df_grouped.empty:
+                        fig_gen = px.area(df_grouped, x='date', y='level_numeric', title="Evolução Média Geral (Todas Habilidades)", markers=True)
+                        fig_gen.update_yaxes(range=[0, 4.5], title="Nível Médio")
+                        st.plotly_chart(fig_gen, use_container_width=True)
+                        st.caption("Nota: Este gráfico mostra a média dos níveis atribuídos em cada data de avaliação.")
+                    else:
+                        st.warning("Sem dados suficientes.")
 
 
 # ==============================================================================
@@ -560,10 +571,11 @@ def main():
     if login():
         user = st.session_state["user_info"]
         
+        # Sidebar simplificado
         with st.sidebar:
-            st.image("https://cdn-icons-png.flaticon.com/512/3413/3413535.png", width=100)
-            st.title(f"Olá, {user['name']}")
-            st.write(f"Perfil: **{user['role']}**")
+            st.image("https://cdn-icons-png.flaticon.com/512/3413/3413535.png", width=50)
+            # 3. Layout: Nome no Sidebar ao invés de Header GIGANTE
+            st.write(f"Olá, **{user['name']}**")
             
             if st.button("Sair"):
                 st.session_state["logged_in"] = False
@@ -574,7 +586,7 @@ def main():
         elif user['role'].lower() == 'professor':
             teacher_module(user)
         else:
-            st.error("Perfil de usuário desconhecido.")
+            st.error("Perfil desconhecido.")
 
 if __name__ == "__main__":
     main()
