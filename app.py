@@ -634,6 +634,7 @@ def teacher_module(user_info):
                         
                         df_student = df_turma[df_turma['student_id'] == student_sel_g].copy()
                         df_student['date'] = pd.to_datetime(df_student['date'])
+                        df_student['level_numeric'] = pd.to_numeric(df_student['level_assigned'], errors='coerce')
                         
                         df_grouped = df_student.groupby('date')['level_numeric'].mean().reset_index()
                         
