@@ -606,6 +606,7 @@ def teacher_module(user_info):
                             skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique(), key="rep_skill_sel")
                         
                         evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
+                        evo_df['level_numeric'] = pd.to_numeric(evo_df['level_assigned'], errors='coerce')
                         
                         if not evo_df.empty:
                             # Tentar pegar nome do aluno
