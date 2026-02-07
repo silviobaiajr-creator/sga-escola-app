@@ -529,68 +529,121 @@ def teacher_module(user_info):
     # --- ABA 3: RELATÓRIOS ---
     with tab3:
         all_assessments = get_data("assessments")
+        # Garantir coluna discipline
+        if 'discipline' not in all_assessments.columns:
+            all_assessments['discipline'] = 'Geral'
+            
         class_assessments = all_assessments[all_assessments['class_name'].isin(allowed_classes)]
         
         if class_assessments.empty:
-            st.info("Sem dados.")
+            st.info("Sem dados para as turmas permitidas.")
         else:
-             # Filtro Global da Aba
-            class_filter = st.selectbox("Turma para Análise", allowed_classes, key="rep_class")
-            df_turma = class_assessments[class_assessments['class_name'] == class_filter]
+             # F1. Filtro Turma
+            c_rep1, c_rep2 = st.columns(2)
+            with c_rep1:
+                class_filter = st.selectbox("Turma", allowed_classes, key="rep_class")
             
-            # Processar dados
-            df_final = calcular_notas(df_turma)
-            df_final['level_numeric'] = pd.to_numeric(df_final['level_assigned'], errors='coerce')
+            # F2. Filtro Disciplina
+            with c_rep2:
+                # Identificar disciplinas disponíveis para essa turma
+                # (embora o ideal fosse pegar do user_info, aqui filtramos pelo que tem dados)
+                disc_options = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
+                if len(disc_options) == 0:
+                    disc_options = ["Geral"]
+                
+                # Tentar selecionar a primeira disciplina cadastrada no perfil do professor como default
+                # Mas aqui vamos de selectbox simples
+                disc_filter = st.selectbox("Disciplina", disc_options, key="rep_disc")
 
-            tab_g1, tab_g2 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução"])
+            # Filtrar dados
+            df_turma = class_assessments[
+                (class_assessments['class_name'] == class_filter) &
+                (class_assessments['discipline'] == disc_filter)
+            ]
             
-            with tab_g1:
-                # Heatmap existente
-                if not df_final.empty:
-                    pivot = df_final.pivot_table(index='student_id', columns='bncc_code', values='level_numeric', aggfunc='max')
-                    fig_heat = px.imshow(pivot, color_continuous_scale='RdYlGn', zmin=1, zmax=4, text_auto=True, title="Nível Atual por Habilidade")
-                    st.plotly_chart(fig_heat, use_container_width=True)
-            
-            with tab_g2:
-                # 2. Evolução Geral (Média da Turma ou Média do Aluno)
-                vis_type = st.radio("Visualizar:", ["Individual (Por Habilidade)", "Geral do Aluno (Média Todas Habilidades)"], horizontal=True)
+            if df_turma.empty:
+                st.warning(f"Sem avaliações para {class_filter} na disciplina {disc_filter}.")
+            else:
+                # Processar dados
+                df_final = calcular_notas(df_turma)
+                df_final['level_numeric'] = pd.to_numeric(df_final['level_assigned'], errors='coerce')
+
+                tab_g1, tab_g2 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução"])
                 
-                if vis_type == "Individual (Por Habilidade)":
-                    # Gráfico existente
-                    c_sel1, c_sel2 = st.columns(2)
-                    with c_sel1:
-                        student_sel = st.selectbox("Aluno", df_turma['student_id'].unique(), key="rep_student_sel")
-                    with c_sel2:
-                        skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique(), key="rep_skill_sel")
-                    
-                    evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
-                    if not evo_df.empty:
-                        fig = px.line(evo_df, x='date', y=pd.to_numeric(evo_df['level_assigned']), markers=True, title=f"Evolução: {skill_sel}")
-                        fig.update_yaxes(range=[0.5, 4.5], tickvals=[1,2,3,4])
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.info("Nenhum histórico encontrado para este aluno nesta habilidade.")
+                with tab_g1:
+                    # Heatmap existente
+                    if not df_final.empty:
+                        pivot = df_final.pivot_table(index='student_id', columns='bncc_code', values='level_numeric', aggfunc='max')
+                        
+                        # Pegar nome do aluno para o eixo Y (opcional, se quiser trocar ID por Nome)
+                        # Precisaria fazer merge com students_df. Vamos manter ID por enquanto mas trocar título.
+                        st.markdown(f"**Mapa de Calor: {class_filter} - {disc_filter}**")
+                        
+                        fig_heat = px.imshow(pivot, 
+                                            color_continuous_scale='RdYlGn', 
+                                            zmin=1, zmax=4, 
+                                            text_auto=True,
+                                            aspect="auto")
+                        
+                        fig_heat.update_layout(
+                            title=f"Nível Habilidades - {disc_filter}",
+                            xaxis_title="Habilidade",
+                            yaxis_title="Aluno"
+                        )
+                        st.plotly_chart(fig_heat, use_container_width=True)
                 
-                else:
-                    # Nova funcionalidade: Média Geral do Aluno ao longo do tempo
-                    student_sel_g = st.selectbox("Selecione o Aluno", df_turma['student_id'].unique(), key="st_gen")
+                with tab_g2:
+                    st.markdown(f"**Análise Evolutiva - {class_filter} ({disc_filter})**")
                     
-                    # Filtrar aluno
-                    df_student = df_turma[df_turma['student_id'] == student_sel_g].copy()
-                    df_student['date'] = pd.to_datetime(df_student['date'])
-                    df_student['level_numeric'] = pd.to_numeric(df_student['level_assigned'])
+                    # 2. Evolução Geral (Média da Turma ou Média do Aluno)
+                    vis_type = st.radio("Visualizar:", ["Individual (Por Habilidade)", "Geral do Aluno (Média Todas Habilidades)"], horizontal=True)
                     
-                    # Agrupar por data (Média de todas as habilidades avaliadas naquele dia/período)
-                    # Para ser mais justo, calculamos a média ACUMULADA. Mas simplificado: Média por dia de avaliação.
-                    df_grouped = df_student.groupby('date')['level_numeric'].mean().reset_index()
+                    if vis_type == "Individual (Por Habilidade)":
+                        c_sel1, c_sel2 = st.columns(2)
+                        with c_sel1:
+                            student_sel = st.selectbox("Aluno", df_turma['student_id'].unique(), key="rep_student_sel")
+                        with c_sel2:
+                            skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique(), key="rep_skill_sel")
+                        
+                        evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
+                        
+                        if not evo_df.empty:
+                            # Tentar pegar nome do aluno
+                            try:
+                                students_ref = get_data("students")
+                                st_name = students_ref[students_ref['student_id'] == str(student_sel)]['student_name'].iloc[0]
+                            except:
+                                st_name = student_sel
+
+                            fig = px.line(evo_df, x='date', y='level_numeric', markers=True, 
+                                        title=f"Evolução: {st_name} | {skill_sel} | {disc_filter}")
+                            fig.update_yaxes(range=[0.5, 4.5], tickvals=[1,2,3,4])
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("Nenhum histórico encontrado para este aluno nesta habilidade e disciplina.")
                     
-                    if not df_grouped.empty:
-                        fig_gen = px.area(df_grouped, x='date', y='level_numeric', title="Evolução Média Geral (Todas Habilidades)", markers=True)
-                        fig_gen.update_yaxes(range=[0, 4.5], title="Nível Médio")
-                        st.plotly_chart(fig_gen, use_container_width=True)
-                        st.caption("Nota: Este gráfico mostra a média dos níveis atribuídos em cada data de avaliação.")
                     else:
-                        st.warning("Sem dados suficientes.")
+                        # Média Geral
+                        student_sel_g = st.selectbox("Selecione o Aluno", df_turma['student_id'].unique(), key="st_gen")
+                         # Tentar pegar nome do aluno
+                        try:
+                            students_ref = get_data("students")
+                            st_name_g = students_ref[students_ref['student_id'] == str(student_sel_g)]['student_name'].iloc[0]
+                        except:
+                            st_name_g = student_sel_g
+                        
+                        df_student = df_turma[df_turma['student_id'] == student_sel_g].copy()
+                        df_student['date'] = pd.to_datetime(df_student['date'])
+                        
+                        df_grouped = df_student.groupby('date')['level_numeric'].mean().reset_index()
+                        
+                        if not df_grouped.empty:
+                            fig_gen = px.area(df_grouped, x='date', y='level_numeric', markers=True, 
+                                            title=f"Evolução Média Geral: {st_name_g} | {disc_filter}")
+                            fig_gen.update_yaxes(range=[0, 4.5], title="Nível Médio")
+                            st.plotly_chart(fig_gen, use_container_width=True)
+                        else:
+                            st.warning("Sem dados suficientes.")
 
 
 # ==============================================================================
