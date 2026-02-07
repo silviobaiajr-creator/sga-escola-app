@@ -427,8 +427,8 @@ def teacher_module(user_info):
                 rubric_options = []
             else:
                 rubric_options = my_rubrics['bncc_code'].unique()
-                selected_skill = st.selectbox("Habilidade", rubric_options)
-        
+                selected_skill = st.selectbox("Habilidade", rubric_options, key="assess_skill_sel")
+
         if not my_rubrics.empty and selected_skill:
              # Visualizar Rubrica Atual (Expander para economizar espaço)
             current_rubric = my_rubrics[my_rubrics['bncc_code'] == selected_skill].iloc[0]
@@ -529,9 +529,9 @@ def teacher_module(user_info):
                     # Gráfico existente
                     c_sel1, c_sel2 = st.columns(2)
                     with c_sel1:
-                        student_sel = st.selectbox("Aluno", df_turma['student_id'].unique())
+                        student_sel = st.selectbox("Aluno", df_turma['student_id'].unique(), key="rep_student_sel")
                     with c_sel2:
-                        skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique())
+                        skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique(), key="rep_skill_sel")
                     
                     evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
                     if not evo_df.empty:
