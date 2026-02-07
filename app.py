@@ -37,7 +37,7 @@ except Exception as e:
 # Definição das abas obrigatórias
 REQUIRED_SHEETS = [
     "setup_classes", "users", "students", "bncc_library", 
-    "teacher_rubrics", "assessments"
+    "teacher_rubrics", "assessments", "setup_disciplines"
 ]
 
 # Função para carregar dados (com cache manual para performance se necessário, mas aqui usando direto)
@@ -167,7 +167,7 @@ def converter_nivel_nota(nivel):
 def admin_module():
     st.title("🛠️ Painel do Administrador")
     
-    tab1, tab2 = st.tabs(["📤 Upload de Alunos", "📊 Dashboards Analíticos"])
+    tab1, tab2, tab3 = st.tabs(["📤 Upload de Alunos", "📚 Gestão de Disciplinas", "📊 Dashboards Analíticos"])
     
     # --- ABA 1: GESTÃO DE ALUNOS ---
     with tab1:
@@ -318,8 +318,51 @@ def admin_module():
                 except Exception as e:
                     st.error(f"Erro ao processar CSV: {e}")
 
-    # --- ABA 2: DASHBOARDS ANALÍTICOS ---
+    # --- ABA 2: GESTÃO DE DISCIPLINAS (NOVO) ---
     with tab2:
+        st.subheader("📚 Cadastro de Disciplinas")
+        st.markdown("Defina as disciplinas que estarão disponíveis no sistema. Isso impacta o cadastro de habilidades.")
+        
+        # Formulário de Adição
+        with st.form("add_discipline_form"):
+            new_disc_name = st.text_input("Nome da Disciplina (ex: Matemática, Ciências)")
+            submitted_disc = st.form_submit_button("Adicionar Disciplina")
+            
+            if submitted_disc:
+                if new_disc_name:
+                    current_discs = get_data("setup_disciplines")
+                    # Verificar duplicidade
+                    if not current_discs.empty and new_disc_name in current_discs['discipline_name'].values:
+                        st.error("Disciplina já cadastrada!")
+                    else:
+                        new_row = pd.DataFrame([{"discipline_name": new_disc_name, "created_at": datetime.now().isoformat()}])
+                        updated_discs = pd.concat([current_discs, new_row], ignore_index=True)
+                        save_data(updated_discs, "setup_disciplines")
+                        st.success(f"Disciplina '{new_disc_name}' adicionada!")
+                        st.rerun()
+                else:
+                    st.warning("Digite um nome.")
+        
+        st.divider()
+        
+        # Listagem e Remoção
+        st.markdown("### Disciplinas Cadastradas")
+        df_discs = get_data("setup_disciplines")
+        if df_discs.empty:
+            st.info("Nenhuma disciplina cadastrada.")
+        else:
+            st.dataframe(df_discs)
+            
+            # Opção de Remover
+            disc_to_remove = st.selectbox("Selecione para Remover", df_discs['discipline_name'].unique(), key="rm_disc_sel")
+            if st.button("🗑️ Remover Disciplina"):
+                df_discs = df_discs[df_discs['discipline_name'] != disc_to_remove]
+                save_data(df_discs, "setup_disciplines")
+                st.success("Removido!")
+                st.rerun()
+
+    # --- ABA 3: DASHBOARDS ANALÍTICOS ---
+    with tab3:
         st.subheader("Visão Geral da Escola")
         
         assessments_df = get_data("assessments")
@@ -373,43 +416,65 @@ def teacher_module(user_info):
         if bncc_df.empty:
             st.warning("Biblioteca BNCC vazia.")
         else:
-            # Seleção de Habilidade
-            bncc_options = bncc_df['code'] + " - " + bncc_df['description'].str[:30] + "..."
-            selected_bncc_str = st.selectbox("Selecione a Habilidade (BNCC)", bncc_options)
-            selected_code = selected_bncc_str.split(" - ")[0]
+            # 1. Seletor de Disciplina (Cascata)
+            # Pega string de disciplinas e quebra por vírgula (Do usuario logado)
+            raw_disciplines = str(user_info.get('disciplina', '')).split(',')
+            allowed_disciplines = [d.strip() for d in raw_disciplines if d.strip()]
+            if not allowed_disciplines:
+                allowed_disciplines = ["Geral"]
             
-            # 7. Exibir Descrição Completa
-            full_desc = bncc_df[bncc_df['code'] == selected_code]['description'].values[0]
-            st.info(f"📄 **Descrição:** {full_desc}")
+            selected_discipline_plan = st.selectbox("Selecione a Disciplina", allowed_disciplines, key="plan_disc_sel")
+
+            # 2. Filtrar BNCC pela Disciplina
+            # Garantir coluna discipline
+            if 'discipline' not in bncc_df.columns:
+                bncc_df['discipline'] = 'Geral'
             
-            with st.form("rubric_form"):
-                st.markdown(f"**Defina os critérios para: {selected_code}**")
-                c_rub1, c_rub2 = st.columns(2)
-                with c_rub1:
-                    l1 = st.text_area("Nível 1 (Iniciante)", height=100)
-                    l2 = st.text_area("Nível 2 (Básico)", height=100)
-                with c_rub2:
-                    l3 = st.text_area("Nível 3 (Proficiente)", height=100)
-                    l4 = st.text_area("Nível 4 (Avançado)", height=100)
+            # Filtrar
+            bncc_filtered = bncc_df[bncc_df['discipline'] == selected_discipline_plan]
+            
+            if bncc_filtered.empty:
+                st.info(f"Nenhuma habilidade cadastrada para {selected_discipline_plan} na Biblioteca BNCC.")
+                selected_code = None
+            else:
+                # Seleção de Habilidade
+                bncc_options = bncc_filtered['code'] + " - " + bncc_filtered['description'].str[:30] + "..."
+                selected_bncc_str = st.selectbox("Selecione a Habilidade (BNCC)", bncc_options)
+                selected_code = selected_bncc_str.split(" - ")[0]
+            
+            if selected_code:
+                # 7. Exibir Descrição Completa
+                full_desc = bncc_filtered[bncc_filtered['code'] == selected_code]['description'].values[0]
+                st.info(f"📄 **Descrição:** {full_desc}")
                 
-                submitted = st.form_submit_button("Salvar Rubrica")
-                if submitted:
-                    new_rubric = pd.DataFrame([{
-                        "rubric_id": f"{user_info['username']}_{selected_code}",
-                        "teacher_username": user_info['username'],
-                        "bncc_code": selected_code,
-                        "desc_level_1": l1,
-                        "desc_level_2": l2,
-                        "desc_level_3": l3,
-                        "desc_level_4": l4
-                    }])
+                with st.form("rubric_form"):
+                    st.markdown(f"**Defina os critérios para: {selected_code}**")
+                    c_rub1, c_rub2 = st.columns(2)
+                    with c_rub1:
+                        l1 = st.text_area("Nível 1 (Iniciante)", height=100)
+                        l2 = st.text_area("Nível 2 (Básico)", height=100)
+                    with c_rub2:
+                        l3 = st.text_area("Nível 3 (Proficiente)", height=100)
+                        l4 = st.text_area("Nível 4 (Avançado)", height=100)
                     
-                    current_rubrics = get_data("teacher_rubrics")
-                    updated_rubrics = pd.concat([current_rubrics, new_rubric], ignore_index=True)
-                    # O ideal seria remover duplicatas do mesmo professor+habilidade antes de salvar
-                    updated_rubrics.drop_duplicates(subset=['teacher_username', 'bncc_code'], keep='last', inplace=True)
-                    
-                    save_data(updated_rubrics, "teacher_rubrics")
+                    submitted = st.form_submit_button("Salvar Rubrica")
+                    if submitted:
+                        new_rubric = pd.DataFrame([{
+                            "rubric_id": f"{user_info['username']}_{selected_code}",
+                            "teacher_username": user_info['username'],
+                            "bncc_code": selected_code,
+                            "desc_level_1": l1,
+                            "desc_level_2": l2,
+                            "desc_level_3": l3,
+                            "desc_level_4": l4
+                        }])
+                        
+                        current_rubrics = get_data("teacher_rubrics")
+                        updated_rubrics = pd.concat([current_rubrics, new_rubric], ignore_index=True)
+                        # O ideal seria remover duplicatas do mesmo professor+habilidade antes de salvar
+                        updated_rubrics.drop_duplicates(subset=['teacher_username', 'bncc_code'], keep='last', inplace=True)
+                        
+                        save_data(updated_rubrics, "teacher_rubrics")
 
     # --- ABA 2: AVALIAÇÃO CONTÍNUA ---
     with tab2:
@@ -443,23 +508,22 @@ def teacher_module(user_info):
             else:
                  my_rubrics = rubrics_df[rubrics_df['teacher_username'] == user_info['username']]
             
+            # FILTRO RELACIONAL: Mostrar apenas rubricas da DISCIPLINA selecionada
+            # Precisamos cruzar com a BNCC Library para sber a disciplina da habilidade
+            bncc_ref = get_data("bncc_library")
+            if not bncc_ref.empty and 'discipline' in bncc_ref.columns:
+                # Merge para trazer a disciplina
+                my_rubrics = my_rubrics.merge(bncc_ref[['code', 'discipline']], left_on='bncc_code', right_on='code', how='left')
+                # Filtrar
+                my_rubrics = my_rubrics[my_rubrics['discipline'] == selected_discipline]
+            
             if my_rubrics.empty:
-                st.warning("Sem rubricas cadastradas.")
+                st.warning(f"Sem rubricas para {selected_discipline}.")
                 rubric_options = []
                 selected_skill = None
             else:
                 rubric_options = my_rubrics['bncc_code'].unique()
                 selected_skill = st.selectbox("Habilidade", rubric_options, key="assess_skill_sel")
-
-        if not my_rubrics.empty and selected_skill:
-             # Visualizar Rubrica Atual (Expander para economizar espaço)
-            current_rubric = my_rubrics[my_rubrics['bncc_code'] == selected_skill].iloc[0]
-            with st.expander("📖 Ver Guia de Correção (Rubrica)", expanded=False):
-                st.markdown(f"""
-                | Nível 1 | Nível 2 | Nível 3 | Nível 4 |
-                |---|---|---|---|
-                | {current_rubric['desc_level_1']} | {current_rubric['desc_level_2']} | {current_rubric['desc_level_3']} | {current_rubric['desc_level_4']} |
-                """)
 
             # Grid de Alunos
             students_df = get_data("students")
