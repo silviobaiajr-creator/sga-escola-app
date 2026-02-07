@@ -44,8 +44,8 @@ REQUIRED_SHEETS = [
 def get_data(worksheet_name):
     """Carrega dados de uma aba específica."""
     try:
-        # ttl=0 força a leitura do Google Sheets para garantir dados atualizados
-        df = conn.read(worksheet=worksheet_name, ttl=0)
+        # ttl=15 evita erro 429 (Quota Exceeded) do Google Sheets
+        df = conn.read(worksheet=worksheet_name, ttl=15)
         return df
     except Exception as e:
         # Se a aba não existir, tenta criar (embora o correto seja o admin criar a planilha base)
