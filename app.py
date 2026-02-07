@@ -546,14 +546,33 @@ def teacher_module(user_info):
             # F2. Filtro Disciplina
             with c_rep2:
                 # Identificar disciplinas disponíveis para essa turma
-                # (embora o ideal fosse pegar do user_info, aqui filtramos pelo que tem dados)
-                disc_options = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
-                if len(disc_options) == 0:
-                    disc_options = ["Geral"]
+                available_disciplines = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
                 
-                # Tentar selecionar a primeira disciplina cadastrada no perfil do professor como default
-                # Mas aqui vamos de selectbox simples
-                disc_filter = st.selectbox("Disciplina", disc_options, key="rep_disc")
+                # RESTRINDIR APENAS ÀS DISCIPLINAS DO PROFESSOR
+                # allowed_disciplines já foi calculado na aba 2, mas vamos recalcular aqui ou garantir escopo
+                # Pega string de disciplinas e quebra por vírgula
+                raw_disciplines_user = str(user_info.get('disciplina', '')).split(',')
+                user_disciplines = [d.strip() for d in raw_disciplines_user if d.strip()]
+                
+                if not user_disciplines:
+                    user_disciplines = ["Geral"]
+
+                # Interseção: O que tem na turma E o que o professor pode ver
+                if "Geral" in user_disciplines:
+                     # Se professor for Geral, vê tudo? Assumindo que "Geral" é uma disciplina específica ou coringa.
+                     # Se for coringa de admin, ok. Se for disciplina, mantém.
+                     # Vamos assumir comportamento estrito: Só vê o que tá na lista dele.
+                     final_options = [d for d in available_disciplines if d in user_disciplines]
+                else:
+                     final_options = [d for d in available_disciplines if d in user_disciplines]
+                
+                if not final_options:
+                    # Se não tiver interseção (ex: Prof de Mat vindo numa turma que só tem nota de Port),
+                    # não deve ver nada ou mostrar aviso.
+                    # Vamos adicionar uma opção vazia ou travar.
+                    final_options = ["Sem permissão/dados"]
+
+                disc_filter = st.selectbox("Disciplina", final_options, key="rep_disc")
 
             # Filtrar dados
             df_turma = class_assessments[
