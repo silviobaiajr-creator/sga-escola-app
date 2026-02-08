@@ -697,9 +697,16 @@ def teacher_module(user_info):
                 # Garantir tipos para merge e filtros
                 df_turma['student_id'] = df_turma['student_id'].astype(str)
                 
-                # Processar dados
+                # Processar dados para Status Atual (df_final)
                 df_final = calcular_notas(df_turma)
                 df_final['level_numeric'] = pd.to_numeric(df_final['level_assigned'], errors='coerce')
+
+                # Processar dados para Histórico Completo (df_history)
+                df_history = df_turma.copy()
+                df_history['date'] = pd.to_datetime(df_history['date'], errors='coerce')
+                df_history['level_numeric'] = pd.to_numeric(df_history['level_assigned'], errors='coerce')
+                # Ordenar por data
+                df_history = df_history.sort_values(by='date')
 
                 # MERGE COM NOMES DOS ALUNOS
                 students_db = get_data("students")
@@ -716,8 +723,15 @@ def teacher_module(user_info):
                     df_final = df_final.merge(students_db[['student_id_clean', 'student_name']], left_on='student_id', right_on='student_id_clean', how='left')
                     # Preencher nulos com ID se não achar nome
                     df_final['student_name'] = df_final['student_name'].fillna(df_final['student_id'])
+
+                    # Merge em df_history
+                    df_history['student_id'] = df_history['student_id'].astype(str).astype(float).astype(int).astype(str)
+                    df_history = df_history.merge(students_db[['student_id_clean', 'student_name']], left_on='student_id', right_on='student_id_clean', how='left')
+                    df_history['student_name'] = df_history['student_name'].fillna(df_history['student_id'])
+
                 else:
                     df_final['student_name'] = df_final['student_id']
+                    df_history['student_name'] = df_history['student_id']
 
                 tab_g1, tab_g2, tab_g3, tab_g4, tab_g5 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução", "🎯 Alunos em Foco", "📅 Fechamento Bimestral", "📋 Médias em Tempo Real"])
                 
@@ -750,8 +764,8 @@ def teacher_module(user_info):
                         c_sel1, c_sel2 = st.columns(2)
                         with c_sel1:
                             # Lista de tuplas (Nome, ID) para facilitar
-                            # Usar df_final que já tem student_id limpo e nomes
-                            student_options = df_final[['student_id', 'student_name']].drop_duplicates().sort_values('student_name')
+                            # Usar df_history que tem TODOS os alunos que já tiveram nota (histórico completo)
+                            student_options = df_history[['student_id', 'student_name']].drop_duplicates().sort_values('student_name')
                             
                             if not student_options.empty:
                                 student_options['display'] = student_options['student_name'] + " (" + student_options['student_id'] + ")"
@@ -766,16 +780,16 @@ def teacher_module(user_info):
                                 st_name_display = ""
 
                         with c_sel2:
-                            # Filtra as habilidades que o aluno selecionado TEM
+                            # Filtra as habilidades que o aluno selecionado TEM no histórico
                             if student_sel:
-                                skills_student = df_final[df_final['student_id'] == student_sel]['bncc_code'].unique()
+                                skills_student = df_history[df_history['student_id'] == student_sel]['bncc_code'].unique()
                                 skill_sel = st.selectbox("Habilidade", skills_student, key="rep_skill_sel")
                             else:
                                 skill_sel = None
                         
                         if student_sel and skill_sel:
-                            # Filtrar no df_final que já está processado e limpo
-                            evo_df = df_final[(df_final['student_id'] == student_sel) & (df_final['bncc_code'] == skill_sel)].sort_values('date')
+                            # Filtrar no df_history (HISTÓRICO COMPLETO)
+                            evo_df = df_history[(df_history['student_id'] == student_sel) & (df_history['bncc_code'] == skill_sel)].sort_values('date')
                             
                             if not evo_df.empty:
                                 fig = px.line(evo_df, x='date', y='level_numeric', markers=True, 
