@@ -59,6 +59,7 @@ def save_data(df, worksheet_name):
     """Salva/Sobrescreve dados em uma aba específica."""
     try:
         conn.update(worksheet=worksheet_name, data=df)
+        st.cache_data.clear() # Limpar cache para garantir atualização imediata
         st.success(f"Dados salvos com sucesso em '{worksheet_name}'!")
     except Exception as e:
         st.error(f"Erro ao salvar em '{worksheet_name}': {e}")
@@ -629,10 +630,14 @@ def teacher_module(user_info):
         if class_assessments.empty:
             st.info("Sem dados para as turmas permitidas.")
         else:
-             # F1. Filtro Turma
-            c_rep1, c_rep2 = st.columns(2)
+             # F1. Filtros Principais
+            c_rep1, c_rep2, c_rep3 = st.columns(3)
             with c_rep1:
                 class_filter = st.selectbox("Turma", allowed_classes, key="rep_class")
+            
+            with c_rep3:
+                # Filtro de Bimestre
+                bim_filter_rep = st.selectbox("Bimestre", ["Todos", "1º", "2º", "3º", "4º"], key="rep_bim_main")
             
             # F2. Filtro Disciplina (COM MAPPING ID -> NOME)
             with c_rep2:
@@ -684,10 +689,14 @@ def teacher_module(user_info):
             # Filtrar dados (Normalizando ID no dataframe antes de comparar)
             if not class_assessments.empty:
                 class_assessments['discipline_norm'] = class_assessments['discipline'].astype(str).str.strip().str.upper()
-                df_turma = class_assessments[
-                    (class_assessments['class_name'] == class_filter) &
-                    (class_assessments['discipline_norm'] == disc_filter)
-                ]
+                
+                mask = (class_assessments['class_name'] == class_filter) & \
+                       (class_assessments['discipline_norm'] == disc_filter)
+                
+                if bim_filter_rep != "Todos":
+                    mask = mask & (class_assessments['bimester_ref'] == bim_filter_rep)
+                    
+                df_turma = class_assessments[mask]
             else:
                  df_turma = pd.DataFrame()
             
