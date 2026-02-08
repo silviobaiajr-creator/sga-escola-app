@@ -167,7 +167,7 @@ def converter_nivel_nota(nivel):
 def admin_module():
     st.title("🛠️ Painel do Administrador")
     
-    tab1, tab2, tab3 = st.tabs(["📤 Upload de Alunos", "📚 Gestão de Disciplinas", "📊 Dashboards Analíticos"])
+    tab1, tab2 = st.tabs(["📤 Upload de Alunos", "📊 Dashboards Analíticos"])
     
     # --- ABA 1: GESTÃO DE ALUNOS ---
     with tab1:
@@ -318,51 +318,8 @@ def admin_module():
                 except Exception as e:
                     st.error(f"Erro ao processar CSV: {e}")
 
-    # --- ABA 2: GESTÃO DE DISCIPLINAS (NOVO) ---
+    # --- ABA 2: DASHBOARDS ANALÍTICOS (Renomeado de tab3) ---
     with tab2:
-        st.subheader("📚 Cadastro de Disciplinas")
-        st.markdown("Defina as disciplinas que estarão disponíveis no sistema. Isso impacta o cadastro de habilidades.")
-        
-        # Formulário de Adição
-        with st.form("add_discipline_form"):
-            new_disc_name = st.text_input("Nome da Disciplina (ex: Matemática, Ciências)")
-            submitted_disc = st.form_submit_button("Adicionar Disciplina")
-            
-            if submitted_disc:
-                if new_disc_name:
-                    current_discs = get_data("setup_disciplines")
-                    # Verificar duplicidade
-                    if not current_discs.empty and new_disc_name in current_discs['discipline_name'].values:
-                        st.error("Disciplina já cadastrada!")
-                    else:
-                        new_row = pd.DataFrame([{"discipline_name": new_disc_name, "created_at": datetime.now().isoformat()}])
-                        updated_discs = pd.concat([current_discs, new_row], ignore_index=True)
-                        save_data(updated_discs, "setup_disciplines")
-                        st.success(f"Disciplina '{new_disc_name}' adicionada!")
-                        st.rerun()
-                else:
-                    st.warning("Digite um nome.")
-        
-        st.divider()
-        
-        # Listagem e Remoção
-        st.markdown("### Disciplinas Cadastradas")
-        df_discs = get_data("setup_disciplines")
-        if df_discs.empty:
-            st.info("Nenhuma disciplina cadastrada.")
-        else:
-            st.dataframe(df_discs)
-            
-            # Opção de Remover
-            disc_to_remove = st.selectbox("Selecione para Remover", df_discs['discipline_name'].unique(), key="rm_disc_sel")
-            if st.button("🗑️ Remover Disciplina"):
-                df_discs = df_discs[df_discs['discipline_name'] != disc_to_remove]
-                save_data(df_discs, "setup_disciplines")
-                st.success("Removido!")
-                st.rerun()
-
-    # --- ABA 3: DASHBOARDS ANALÍTICOS ---
-    with tab3:
         st.subheader("Visão Geral da Escola")
         
         assessments_df = get_data("assessments")
@@ -416,29 +373,51 @@ def teacher_module(user_info):
         if bncc_df.empty:
             st.warning("Biblioteca BNCC vazia.")
         else:
-            # 1. Seletor de Disciplina (Cascata)
-            # Pega string de disciplinas e quebra por vírgula (Do usuario logado)
-            raw_disciplines = str(user_info.get('disciplina', '')).split(',')
-            allowed_disciplines = [d.strip() for d in raw_disciplines if d.strip()]
-            if not allowed_disciplines:
-                allowed_disciplines = ["Geral"]
-            
-            selected_discipline_plan = st.selectbox("Selecione a Disciplina", allowed_disciplines, key="plan_disc_sel")
+            # 1. Seletor de Disciplina (USANDO IDs e NOMES - Corrigido Case Insensitive)
+            # Carregar tabela de disciplinas para mapear ID -> Nome
+            setup_discs = get_data("setup_disciplines")
+            dict_disc_names = {} # Map ID_UPPER -> Nome
+            if not setup_discs.empty:
+                # Normaliza para maiúsculo para garantir match
+                setup_discs['discipline_id'] = setup_discs['discipline_id'].astype(str).str.strip().str.upper()
+                setup_discs['discipline_name'] = setup_discs['discipline_name'].astype(str).str.strip()
+                dict_disc_names = dict(zip(setup_discs['discipline_id'], setup_discs['discipline_name']))
 
-            # 2. Filtrar BNCC pela Disciplina
+            # Pega string de IDs de disciplinas do usuário
+            raw_ids = str(user_info.get('disciplina', '')).split(',')
+            # Normaliza input do usuário também
+            user_allowed_ids = [d.strip().upper() for d in raw_ids if d.strip()]
+            
+            if not user_allowed_ids:
+                user_allowed_ids = ["GERAL"]
+            
+            # Criar lista de opções para o Selectbox (Nome Bonito)
+            options_map = {}
+            for uid in user_allowed_ids:
+                # Busca no dict (pelo ID Upper). Se não achar, usa o próprio ID
+                name = dict_disc_names.get(uid, uid) 
+                options_map[name] = uid # Nome -> ID_UPPER
+            
+            selected_disc_name = st.selectbox("Selecione a Disciplina", list(options_map.keys()), key="plan_disc_sel")
+            selected_discipline_id = options_map[selected_disc_name] # ID REAL
+
+            # 2. Filtrar BNCC pela Disciplina (Usando ID)
             # Garantir coluna discipline
             if 'discipline' not in bncc_df.columns:
                 bncc_df['discipline'] = 'Geral'
             
-            # Filtrar
-            bncc_filtered = bncc_df[bncc_df['discipline'] == selected_discipline_plan]
+            # Filtrar pelo ID (Normalizar Base BNCC tb)
+            bncc_df['discipline_norm'] = bncc_df['discipline'].astype(str).str.strip().str.upper()
+            
+            # Buscar habilidades desse ID ou Geral
+            bncc_filtered = bncc_df[bncc_df['discipline_norm'] == selected_discipline_id]
             
             if bncc_filtered.empty:
-                st.info(f"Nenhuma habilidade cadastrada para {selected_discipline_plan} na Biblioteca BNCC.")
+                st.info(f"Nenhuma habilidade cadastrada para ID '{selected_discipline_id}' ({selected_disc_name}).")
                 selected_code = None
             else:
                 # Seleção de Habilidade
-                bncc_options = bncc_filtered['code'] + " - " + bncc_filtered['description'].str[:30] + "..."
+                bncc_options = bncc_filtered['code'].astype(str) + " - " + bncc_filtered['description'].astype(str).str[:40] + "..."
                 selected_bncc_str = st.selectbox("Selecione a Habilidade (BNCC)", bncc_options)
                 selected_code = selected_bncc_str.split(" - ")[0]
             
@@ -488,17 +467,29 @@ def teacher_module(user_info):
             allowed_classes = [c.strip() for c in str(user_info.get('allowed_classes', '')).split(',')]
             selected_class = st.selectbox("Turma", allowed_classes)
         
-        # B. Disciplina (NOVO)
+        # B. Disciplina (USANDO IDs e NOMES - Mesma lógica)
         with cf2:
-            # Pega string de disciplinas e quebra por vírgula
-            raw_disciplines = str(user_info.get('disciplina', '')).split(',')
-            allowed_disciplines = [d.strip() for d in raw_disciplines if d.strip()]
+            # Reutilizar lógica de mapeamento (Normalizado Upper)
+            setup_discs = get_data("setup_disciplines")
+            dict_disc_names = {}
+            if not setup_discs.empty:
+                setup_discs['discipline_id'] = setup_discs['discipline_id'].astype(str).str.strip().str.upper()
+                setup_discs['discipline_name'] = setup_discs['discipline_name'].astype(str).str.strip()
+                dict_disc_names = dict(zip(setup_discs['discipline_id'], setup_discs['discipline_name']))
+
+            raw_ids = str(user_info.get('disciplina', '')).split(',')
+            user_allowed_ids = [d.strip().upper() for d in raw_ids if d.strip()]
             
-            if not allowed_disciplines:
-                # Fallback se não tiver nada cadastrado
-                allowed_disciplines = ["Geral"]
+            if not user_allowed_ids:
+                user_allowed_ids = ["GERAL"]
             
-            selected_discipline = st.selectbox("Disciplina", allowed_disciplines)
+            options_map = {}
+            for uid in user_allowed_ids:
+                name = dict_disc_names.get(uid, uid)
+                options_map[name] = uid
+            
+            selected_disc_name = st.selectbox("Disciplina", list(options_map.keys()), key="assess_disc_sel")
+            selected_discipline_id = options_map[selected_disc_name] # ID REAL
 
         # C. Habilidade
         with cf3:
@@ -531,16 +522,16 @@ def teacher_module(user_info):
 
                 my_rubrics = my_rubrics.merge(bncc_ref[['code', 'discipline']], left_on='bncc_code', right_on='code', how='left')
                 
-                # Filtrar
+                # Filtrar pelo ID (Normalizado)
                 if 'discipline' in my_rubrics.columns:
-                    my_rubrics = my_rubrics[my_rubrics['discipline'] == selected_discipline]
+                    my_rubrics['discipline_norm'] = my_rubrics['discipline'].astype(str).str.strip().str.upper()
+                    my_rubrics = my_rubrics[my_rubrics['discipline_norm'] == selected_discipline_id]
             else:
                 # Fallback: Se não conseguir filtrar, mostra aviso mas não quebra
-                # st.warning("Não foi possível filtrar por disciplina devido a incompatibilidade na planilha.")
                 pass
             
             if my_rubrics.empty:
-                st.warning(f"Sem rubricas para {selected_discipline}.")
+                st.warning(f"Sem rubricas para {selected_disc_name}.")
                 rubric_options = []
                 selected_skill = None
             else:
@@ -556,7 +547,7 @@ def teacher_module(user_info):
             
             if not class_students.empty:
                 with st.form("assessment_form"):
-                    st.write(f"Avaliando: **{selected_class}** - **{selected_discipline}** - **{selected_skill}**")
+                    st.write(f"Avaliando: **{selected_class}** - **{selected_disc_name}** - **{selected_skill}**")
                     
                     grades = {}
                     
@@ -565,7 +556,9 @@ def teacher_module(user_info):
                         c_alu, c_nota = st.columns([2, 3])
                         with c_alu:
                             st.write(f"**{row['student_name']}**")
-                            st.caption(f"ID: {row['student_id']}")
+                            # Formatar ID removendo .0
+                            s_id = str(row['student_id']).replace('.0', '')
+                            st.caption(f"ID: {s_id}")
                         with c_nota:
                             # 4. Input Otimizado: Radio horizontal
                             grades[row['student_id']] = st.radio(
@@ -597,7 +590,7 @@ def teacher_module(user_info):
                                 "date": data_ref,
                                 "bimester_ref": bimester,
                                 "teacher": user_info['username'],
-                                "discipline": selected_discipline, # Campo novo
+                                "discipline": selected_discipline_id, # Salvar o ID (ex: MAT), não o nome
                                 "class_name": selected_class,
                                 "student_id": student_id,
                                 "bncc_code": selected_skill,
@@ -631,18 +624,21 @@ def teacher_module(user_info):
             
             # F2. Filtro Disciplina (COM MAPPING ID -> NOME)
             with c_rep2:
-                # 1. Identificar disciplinas (IDs) disponíveis nos dados da turma
-                available_disc_ids = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
+                # 1. Identificar disciplinas (IDs) disponíveis nos dados da turma e normalizar
+                if not class_assessments.empty:
+                    available_disc_ids = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].astype(str).str.strip().str.upper().unique()
+                else:
+                    available_disc_ids = []
                 
                 # 2. Identificar disciplinas (IDs) permitidas ao professor
                 raw_disciplines_user = str(user_info.get('disciplina', '')).split(',')
-                user_allowed_ids = [d.strip() for d in raw_disciplines_user if d.strip()]
+                user_allowed_ids = [d.strip().upper() for d in raw_disciplines_user if d.strip()]
                 
                 if not user_allowed_ids:
-                    user_allowed_ids = ["Geral"]
+                    user_allowed_ids = ["GERAL"]
 
                 # 3. Interseção (Quais IDs ele pode ver que têm dados)
-                if "Geral" in user_allowed_ids:
+                if "GERAL" in user_allowed_ids:
                      # Se for Geral/Admin, vê tudo que tem na turma
                      final_ids = available_disc_ids
                 else:
@@ -656,7 +652,7 @@ def teacher_module(user_info):
                 setup_discs = get_data("setup_disciplines")
                 dict_disc_names = {}
                 if not setup_discs.empty:
-                    setup_discs['discipline_id'] = setup_discs['discipline_id'].astype(str).str.strip()
+                    setup_discs['discipline_id'] = setup_discs['discipline_id'].astype(str).str.strip().str.upper()
                     setup_discs['discipline_name'] = setup_discs['discipline_name'].astype(str).str.strip()
                     dict_disc_names = dict(zip(setup_discs['discipline_id'], setup_discs['discipline_name']))
                 
@@ -673,14 +669,18 @@ def teacher_module(user_info):
                     st.warning("Sem permissão ou dados nesta turma.")
                     disc_filter = None
 
-            # Filtrar dados
-            df_turma = class_assessments[
-                (class_assessments['class_name'] == class_filter) &
-                (class_assessments['discipline'] == disc_filter)
-            ]
+            # Filtrar dados (Normalizando ID no dataframe antes de comparar)
+            if not class_assessments.empty:
+                class_assessments['discipline_norm'] = class_assessments['discipline'].astype(str).str.strip().str.upper()
+                df_turma = class_assessments[
+                    (class_assessments['class_name'] == class_filter) &
+                    (class_assessments['discipline_norm'] == disc_filter)
+                ]
+            else:
+                 df_turma = pd.DataFrame()
             
             if df_turma.empty:
-                st.warning(f"Sem avaliações para {class_filter} na disciplina {disc_filter}.")
+                st.warning(f"Sem avaliações para {class_filter} na disciplina {disc_filter_name if 'disc_filter_name' in locals() else ''}.")
             else:
                 # Garantir tipos para merge e filtros
                 df_turma['student_id'] = df_turma['student_id'].astype(str)
@@ -692,11 +692,16 @@ def teacher_module(user_info):
                 # MERGE COM NOMES DOS ALUNOS
                 students_db = get_data("students")
                 if not students_db.empty:
-                    # Garantir que student_id seja string em ambos
-                    df_final['student_id'] = df_final['student_id'].astype(str)
-                    students_db['student_id'] = students_db['student_id'].astype(str)
+                    # Garantir que student_id seja string limpa em ambos
+                    df_final['student_id'] = df_final['student_id'].astype(str).astype(float).astype(int).astype(str) # Remove .0 dirty
                     
-                    df_final = df_final.merge(students_db[['student_id', 'student_name']], on='student_id', how='left')
+                    # Limpeza no DB de alunos também
+                    def clean_id_s(x):
+                        return str(x).replace('.0', '').strip()
+                    
+                    students_db['student_id_clean'] = students_db['student_id'].apply(clean_id_s)
+                    
+                    df_final = df_final.merge(students_db[['student_id_clean', 'student_name']], left_on='student_id', right_on='student_id_clean', how='left')
                     # Preencher nulos com ID se não achar nome
                     df_final['student_name'] = df_final['student_name'].fillna(df_final['student_id'])
                 else:
