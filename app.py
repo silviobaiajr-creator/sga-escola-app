@@ -629,36 +629,49 @@ def teacher_module(user_info):
             with c_rep1:
                 class_filter = st.selectbox("Turma", allowed_classes, key="rep_class")
             
-            # F2. Filtro Disciplina
+            # F2. Filtro Disciplina (COM MAPPING ID -> NOME)
             with c_rep2:
-                # Identificar disciplinas disponíveis para essa turma
-                available_disciplines = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
+                # 1. Identificar disciplinas (IDs) disponíveis nos dados da turma
+                available_disc_ids = class_assessments[class_assessments['class_name'] == class_filter]['discipline'].unique()
                 
-                # RESTRINDIR APENAS ÀS DISCIPLINAS DO PROFESSOR
-                # allowed_disciplines já foi calculado na aba 2, mas vamos recalcular aqui ou garantir escopo
-                # Pega string de disciplinas e quebra por vírgula
+                # 2. Identificar disciplinas (IDs) permitidas ao professor
                 raw_disciplines_user = str(user_info.get('disciplina', '')).split(',')
-                user_disciplines = [d.strip() for d in raw_disciplines_user if d.strip()]
+                user_allowed_ids = [d.strip() for d in raw_disciplines_user if d.strip()]
                 
-                if not user_disciplines:
-                    user_disciplines = ["Geral"]
+                if not user_allowed_ids:
+                    user_allowed_ids = ["Geral"]
 
-                # Interseção: O que tem na turma E o que o professor pode ver
-                if "Geral" in user_disciplines:
-                     # Se professor for Geral, vê tudo? Assumindo que "Geral" é uma disciplina específica ou coringa.
-                     # Se for coringa de admin, ok. Se for disciplina, mantém.
-                     # Vamos assumir comportamento estrito: Só vê o que tá na lista dele.
-                     final_options = [d for d in available_disciplines if d in user_disciplines]
+                # 3. Interseção (Quais IDs ele pode ver que têm dados)
+                if "Geral" in user_allowed_ids:
+                     # Se for Geral/Admin, vê tudo que tem na turma
+                     final_ids = available_disc_ids
                 else:
-                     final_options = [d for d in available_disciplines if d in user_disciplines]
+                     # Apenas a interseção
+                     final_ids = [d for d in available_disc_ids if d in user_allowed_ids]
                 
-                if not final_options:
-                    # Se não tiver interseção (ex: Prof de Mat vindo numa turma que só tem nota de Port),
-                    # não deve ver nada ou mostrar aviso.
-                    # Vamos adicionar uma opção vazia ou travar.
-                    final_options = ["Sem permissão/dados"]
+                if len(final_ids) == 0:
+                    final_ids = []
 
-                disc_filter = st.selectbox("Disciplina", final_options, key="rep_disc")
+                # 4. Mapear IDs para Nomes para exibir bonito
+                setup_discs = get_data("setup_disciplines")
+                dict_disc_names = {}
+                if not setup_discs.empty:
+                    setup_discs['discipline_id'] = setup_discs['discipline_id'].astype(str).str.strip()
+                    setup_discs['discipline_name'] = setup_discs['discipline_name'].astype(str).str.strip()
+                    dict_disc_names = dict(zip(setup_discs['discipline_id'], setup_discs['discipline_name']))
+                
+                # Criar opções {Nome: ID}
+                options_map = {}
+                if len(final_ids) > 0:
+                    for uid in final_ids:
+                        name = dict_disc_names.get(uid, uid) # Se não achar nome, usa ID
+                        options_map[name] = uid
+                    
+                    disc_filter_name = st.selectbox("Disciplina", list(options_map.keys()), key="rep_disc")
+                    disc_filter = options_map[disc_filter_name] # ID REAL
+                else:
+                    st.warning("Sem permissão ou dados nesta turma.")
+                    disc_filter = None
 
             # Filtrar dados
             df_turma = class_assessments[
