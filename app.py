@@ -560,11 +560,13 @@ def teacher_module(user_info):
                             s_id = str(row['student_id']).replace('.0', '')
                             st.caption(f"ID: {s_id}")
                         with c_nota:
-                            # 4. Input Otimizado: Radio horizontal
+                            # 4. Input Otimizado: Radio horizontal com valor padrão vazio (index=None)
+                            # Permite desmarcar/pular alunos
                             grades[row['student_id']] = st.radio(
                                 "Nível", 
                                 options=["1", "2", "3", "4"],
                                 horizontal=True,
+                                index=None, # Vazio por padrão
                                 key=f"grade_{row['student_id']}",
                                 label_visibility="collapsed"
                             )
@@ -584,27 +586,37 @@ def teacher_module(user_info):
                     if submit_grades:
                         new_assessments = []
                         timestamp = datetime.now().isoformat()
-                        for student_id, level in grades.items():
-                            new_assessments.append({
-                                "timestamp": timestamp,
-                                "date": data_ref,
-                                "bimester_ref": bimester,
-                                "teacher": user_info['username'],
-                                "discipline": selected_discipline_id, # Salvar o ID (ex: MAT), não o nome
-                                "class_name": selected_class,
-                                "student_id": student_id,
-                                "bncc_code": selected_skill,
-                                "level_assigned": level
-                            })
-                        df_new = pd.DataFrame(new_assessments)
-                        current_assessments = get_data("assessments")
                         
-                        # Garantir que assessment tenha coluna discipline se não tiver
-                        if not current_assessments.empty and 'discipline' not in current_assessments.columns:
-                            current_assessments['discipline'] = 'Geral'
+                        count_saved = 0
+                        for student_id, level in grades.items():
+                            # Só salva se tiver nível selecionado
+                            if level is not None:
+                                new_assessments.append({
+                                    "timestamp": timestamp,
+                                    "date": data_ref,
+                                    "bimester_ref": bimester,
+                                    "teacher": user_info['username'],
+                                    "discipline": selected_discipline_id, # Salvar o ID (ex: MAT), não o nome
+                                    "class_name": selected_class,
+                                    "student_id": student_id,
+                                    "bncc_code": selected_skill,
+                                    "level_assigned": level
+                                })
+                                count_saved += 1
+                        
+                        if count_saved > 0:
+                            df_new = pd.DataFrame(new_assessments)
+                            current_assessments = get_data("assessments")
+                            
+                            # Garantir que assessment tenha coluna discipline se não tiver
+                            if not current_assessments.empty and 'discipline' not in current_assessments.columns:
+                                current_assessments['discipline'] = 'Geral'
 
-                        df_updated = pd.concat([current_assessments, df_new], ignore_index=True)
-                        save_data(df_updated, "assessments")
+                            df_updated = pd.concat([current_assessments, df_new], ignore_index=True)
+                            save_data(df_updated, "assessments")
+                            st.success(f"{count_saved} avaliações salvas com sucesso!")
+                        else:
+                            st.info("Nenhuma nota selecionada para salvar.")
     # --- ABA 3: RELATÓRIOS ---
     with tab3:
         all_assessments = get_data("assessments")
@@ -707,7 +719,7 @@ def teacher_module(user_info):
                 else:
                     df_final['student_name'] = df_final['student_id']
 
-                tab_g1, tab_g2, tab_g3 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução", "📋 Médias em Tempo Real"])
+                tab_g1, tab_g2, tab_g3, tab_g4, tab_g5 = st.tabs(["🔥 Mapa de Calor", "📈 Evolução", "🎯 Alunos em Foco", "📅 Fechamento Bimestral", "📋 Médias em Tempo Real"])
                 
                 with tab_g1:
                     # Heatmap com Nomes
@@ -801,7 +813,54 @@ def teacher_module(user_info):
                                 st.warning("Sem dados suficientes.")
 
                 with tab_g3:
-                    st.markdown(f"**Tabela de Médias (Tempo Real) - {class_filter} - {disc_filter}**")
+                    st.markdown("### 🎯 Alunos em Foco (Dificuldades)")
+                    st.caption("Alunos com Nível 1 ou 2 nas habilidades avaliadas.")
+                    
+                    # Filtrar dificuldades (Nível <= 2)
+                    df_risk = df_final[df_final['level_numeric'] <= 2].copy()
+                    
+                    if df_risk.empty:
+                        st.success("🎉 Nenhum aluno com nível 1 ou 2 registrado nesta turma/disciplina.")
+                    else:
+                        # Agrupar por Habilidade
+                        skills_risk = df_risk['bncc_code'].unique()
+                        
+                        for sk in skills_risk:
+                            with st.expander(f"Habilidade: {sk}", expanded=True):
+                                df_sk = df_risk[df_risk['bncc_code'] == sk]
+                                # Selecionar colunas e formatar data
+                                display_sk = df_sk[['student_name', 'level_numeric', 'date', 'bimester_ref']].sort_values('level_numeric')
+                                display_sk.columns = ['Aluno', 'Nível', 'Data', 'Bimestre']
+                                display_sk['Data'] = pd.to_datetime(display_sk['Data']).dt.strftime('%d/%m/%Y')
+                                st.table(display_sk)
+
+                with tab_g4:
+                    st.markdown("### 📅 Fechamento Bimestral")
+                    
+                    sel_bim_close = st.selectbox("Selecione o Bimestre para Fechamento", ["1º", "2º", "3º", "4º"], key="bim_close_sel")
+                    
+                    # Filtrar pelo bimestre
+                    df_bim = df_final[df_final['bimester_ref'] == sel_bim_close]
+                    
+                    if df_bim.empty:
+                        st.warning(f"Sem avaliações registradas para o {sel_bim_close} bimestre.")
+                    else:
+                        # Calcular média dos níveis por aluno
+                        bim_grp = df_bim.groupby(['student_id', 'student_name'])['level_numeric'].mean().reset_index()
+                        
+                        # Converter para nota 0-10
+                        # 1=2.5, 2=5.0, 3=7.5, 4=10.0
+                        bim_grp['Média (0-10)'] = bim_grp['level_numeric'] * 2.5
+                        bim_grp = bim_grp.rename(columns={'student_name': 'Aluno', 'level_numeric': 'Nível Médio'})
+                        
+                        # Formatar
+                        bim_grp['Média (0-10)'] = bim_grp['Média (0-10)'].map('{:.1f}'.format)
+                        bim_grp['Nível Médio'] = bim_grp['Nível Médio'].map('{:.2f}'.format)
+                        
+                        st.dataframe(bim_grp[['Aluno', 'Nível Médio', 'Média (0-10)']].sort_values('Aluno'), use_container_width=True)
+
+                with tab_g5:
+                    st.markdown(f"**Tabela de Médias (Tempo Real) - {class_filter} - {disc_filter_name if 'disc_filter_name' in locals() else disc_filter}**")
                     # Agrupar por Aluno e Calcular Média geral das habilidades atuais
                     avg_table = df_final.groupby(['student_id', 'student_name'])['level_numeric'].mean().reset_index()
                     avg_table.columns = ['ID', 'Nome', 'Nível Médio']
