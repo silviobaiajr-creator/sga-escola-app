@@ -730,7 +730,7 @@ def teacher_module(user_info):
                         st.plotly_chart(fig_heat, use_container_width=True)
                 
                 with tab_g2:
-                    st.markdown(f"**Análise Evolutiva - {class_filter} ({disc_filter})**")
+                    st.markdown(f"**Análise Evolutiva - {class_filter} ({disc_filter_name if 'disc_filter_name' in locals() else disc_filter})**")
                     
                     vis_type = st.radio("Visualizar:", ["Individual (Por Habilidade)", "Geral do Aluno (Média Todas Habilidades)"], horizontal=True)
                     
@@ -738,36 +738,45 @@ def teacher_module(user_info):
                         c_sel1, c_sel2 = st.columns(2)
                         with c_sel1:
                             # Lista de tuplas (Nome, ID) para facilitar
-                            student_options = df_final[['student_id', 'student_name']].drop_duplicates()
+                            # Usar df_final que já tem student_id limpo e nomes
+                            student_options = df_final[['student_id', 'student_name']].drop_duplicates().sort_values('student_name')
+                            
                             if not student_options.empty:
                                 student_options['display'] = student_options['student_name'] + " (" + student_options['student_id'] + ")"
                                 selected_display = st.selectbox("Aluno", student_options['display'], key="rep_student_sel")
                                 
-                                # Extrair ID de volta
+                                # Extrair ID da seleção (que é único)
                                 student_sel = student_options[student_options['display'] == selected_display]['student_id'].values[0]
                                 st_name_display = student_options[student_options['display'] == selected_display]['student_name'].values[0]
                             else:
                                 st.warning("Sem alunos.")
                                 student_sel = None
+                                st_name_display = ""
 
                         with c_sel2:
-                            skill_sel = st.selectbox("Habilidade", df_turma['bncc_code'].unique(), key="rep_skill_sel")
+                            # Filtra as habilidades que o aluno selecionado TEM
+                            if student_sel:
+                                skills_student = df_final[df_final['student_id'] == student_sel]['bncc_code'].unique()
+                                skill_sel = st.selectbox("Habilidade", skills_student, key="rep_skill_sel")
+                            else:
+                                skill_sel = None
                         
-                        if student_sel:
-                            evo_df = df_turma[(df_turma['student_id'] == student_sel) & (df_turma['bncc_code'] == skill_sel)].sort_values('date')
-                            evo_df['level_numeric'] = pd.to_numeric(evo_df['level_assigned'], errors='coerce')
+                        if student_sel and skill_sel:
+                            # Filtrar no df_final que já está processado e limpo
+                            evo_df = df_final[(df_final['student_id'] == student_sel) & (df_final['bncc_code'] == skill_sel)].sort_values('date')
                             
                             if not evo_df.empty:
                                 fig = px.line(evo_df, x='date', y='level_numeric', markers=True, 
-                                            title=f"Evolução: {st_name_display} | {skill_sel} | {disc_filter}")
-                                fig.update_yaxes(range=[0.5, 4.5], tickvals=[1,2,3,4])
+                                            title=f"Evolução: {st_name_display} | {skill_sel} | {disc_filter_name if 'disc_filter_name' in locals() else disc_filter}")
+                                fig.update_yaxes(range=[0.5, 4.5], tickvals=[1,2,3,4], title="Nível")
+                                fig.update_xaxes(title="Data da Avaliação")
                                 st.plotly_chart(fig, use_container_width=True)
                             else:
                                 st.info("Nenhum histórico encontrado para este aluno nesta habilidade e disciplina.")
                     
                     else:
                         # Média Geral
-                        student_options_g = df_final[['student_id', 'student_name']].drop_duplicates()
+                        student_options_g = df_final[['student_id', 'student_name']].drop_duplicates().sort_values('student_name')
                         if not student_options_g.empty:
                             student_options_g['display'] = student_options_g['student_name'] + " (" + student_options_g['student_id'] + ")"
                             
@@ -775,16 +784,18 @@ def teacher_module(user_info):
                             student_sel_g = student_options_g[student_options_g['display'] == selected_display_g]['student_id'].values[0]
                             st_name_g = student_options_g[student_options_g['display'] == selected_display_g]['student_name'].values[0]
                             
-                            df_student = df_turma[df_turma['student_id'] == student_sel_g].copy()
+                            # Filtra no df_final
+                            df_student = df_final[df_final['student_id'] == student_sel_g].copy()
                             df_student['date'] = pd.to_datetime(df_student['date'])
-                            df_student['level_numeric'] = pd.to_numeric(df_student['level_assigned'], errors='coerce')
                             
+                            # Agrupar por data (média de todas as habilidades naquele dia)
                             df_grouped = df_student.groupby('date')['level_numeric'].mean().reset_index()
                             
                             if not df_grouped.empty:
                                 fig_gen = px.area(df_grouped, x='date', y='level_numeric', markers=True, 
-                                                title=f"Evolução Média Geral: {st_name_g} | {disc_filter}")
+                                                title=f"Evolução Média Geral: {st_name_g} | {disc_filter_name if 'disc_filter_name' in locals() else disc_filter}")
                                 fig_gen.update_yaxes(range=[0, 4.5], title="Nível Médio")
+                                fig_gen.update_xaxes(title="Data")
                                 st.plotly_chart(fig_gen, use_container_width=True)
                             else:
                                 st.warning("Sem dados suficientes.")
