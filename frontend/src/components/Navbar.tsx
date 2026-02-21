@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, GradurationCap, LogOut, LayoutDashboard, Database, BrainCircuit } from "lucide-react";
+import { Menu, X, GraduationCap, LogOut, LayoutDashboard, Database, BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
