@@ -1,0 +1,32 @@
+# ─── Segredos (NUNCA enviar para o GitHub!) ───
+.streamlit/secrets.toml
+.streamlit/gcp_key.json
+backend/.env
+.env
+.env.local
+.env.production.local
+
+# ─── Python ───────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ─── Node / Next.js ───────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# ─── Logs e temporários ───────────────────────
+*.log
+migration_log.txt
+test_api.py
+
+# ─── Sistemas operacionais ────────────────────
+.DS_Store
+Thumbs.db

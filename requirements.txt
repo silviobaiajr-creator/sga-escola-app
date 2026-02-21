@@ -1,0 +1,11 @@
+streamlit
+pandas
+plotly
+st-gsheets-connection
+google-generativeai
+google-cloud-aiplatform
+PyPDF2
+statsmodels
+matplotlib
+matplotlib
+pymupdf

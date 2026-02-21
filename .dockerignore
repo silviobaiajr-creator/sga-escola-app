@@ -1,0 +1,25 @@
+# Excluir do build do Docker
+frontend/
+frontend/node_modules/
+.git/
+.gitignore
+*.md
+
+# Arquivos sensíveis (nunca incluir na imagem)
+.streamlit/gcp_key.json
+backend/.env
+.env
+
+# Cache e temporários Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+migration_log.txt
+test_api.py
+etl_supabase.py
