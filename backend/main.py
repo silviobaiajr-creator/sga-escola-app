@@ -7,7 +7,7 @@ import pandas as pd
 from .database import engine, Base, get_db
 from . import models, schemas
 from .services import ai_service, analytics_service
-from .routers import admin, planning, analytics
+from .routers import admin, planning, analytics, auth
 
 app = FastAPI(
     title="SGA-H API v2",
@@ -34,6 +34,7 @@ app.add_middleware(
 # ─────────────────────────────────────────
 # REGISTRAR ROUTERS
 # ─────────────────────────────────────────
+app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(planning.router)
 app.include_router(analytics.router)
