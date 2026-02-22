@@ -8,30 +8,31 @@ import {
     LayoutDashboard,
     Users,
     ClipboardCheck,
-    Library,
-    BrainCircuit,
+    BookOpen,
     BarChart3,
     ShieldCheck,
     ChevronRight,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 const menuItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     {
         name: "Planejamento",
-        icon: Library,
+        icon: BookOpen,
         children: [
             { name: "Biblioteca BNCC", href: "/planejamento/bncc" },
-            { name: "Rubricas de Avaliação", href: "/planejamento/rubricas" },
+            { name: "Objetivos e Rubricas", href: "/planejamento/objetivos" },
+            { name: "Consultor Pedagógico", href: "/planejamento/consultor" },
         ],
     },
     { name: "Avaliação", href: "/avaliacao", icon: ClipboardCheck },
     { name: "Alunos", href: "/alunos", icon: Users },
     { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
-    { name: "IA Pedagógica", href: "/ia", icon: BrainCircuit },
     { name: "Administração", href: "/admin", icon: ShieldCheck },
 ];
+
 
 interface SidebarProps {
     isOpen: boolean;
