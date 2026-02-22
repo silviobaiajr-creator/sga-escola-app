@@ -162,10 +162,20 @@ CREATE TABLE IF NOT EXISTS public.planning_bimester (
 -- PARTE 3: FK ADICIONAL (após criar tabelas)
 -- ================================================================
 
--- Adicionar FK de assessments para learning_objectives
-ALTER TABLE public.assessments
-    ADD CONSTRAINT IF NOT EXISTS fk_assessments_objective
-    FOREIGN KEY (objective_id) REFERENCES public.learning_objectives(id);
+-- Adicionar FK de assessments para learning_objectives (safe — verifica antes de criar)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_assessments_objective'
+          AND table_name = 'assessments'
+    ) THEN
+        ALTER TABLE public.assessments
+            ADD CONSTRAINT fk_assessments_objective
+            FOREIGN KEY (objective_id) REFERENCES public.learning_objectives(id);
+    END IF;
+END $$;
+
 
 -- ================================================================
 -- PARTE 4: ÍNDICES PARA PERFORMANCE

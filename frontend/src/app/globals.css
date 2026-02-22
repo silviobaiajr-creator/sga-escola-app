@@ -3,26 +3,26 @@
 :root {
   --background: #fdfdfd;
   --foreground: #1c1c1e;
-  
+
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  
+
   --secondary: #f4f4f5;
   --secondary-foreground: #18181b;
-  
+
   --accent: #f0f9ff;
   --accent-foreground: #0369a1;
-  
+
   --muted: #f4f4f5;
   --muted-foreground: #71717a;
-  
+
   --card: #ffffff;
   --card-foreground: #1c1c1e;
-  
+
   --border: #e4e4e7;
   --input: #e4e4e7;
   --ring: #2563eb;
-  
+
   --radius: 0.75rem;
 }
 
@@ -30,22 +30,22 @@
   :root {
     --background: #09090b;
     --foreground: #fafafa;
-    
+
     --primary: #3b82f6;
     --primary-foreground: #ffffff;
-    
+
     --secondary: #18181b;
     --secondary-foreground: #fafafa;
-    
+
     --accent: #0c4a6e;
     --accent-foreground: #e0f2fe;
-    
+
     --muted: #18181b;
     --muted-foreground: #a1a1aa;
-    
+
     --card: #09090b;
     --card-foreground: #fafafa;
-    
+
     --border: #27272a;
     --input: #27272a;
     --ring: #3b82f6;
@@ -66,7 +66,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
   --radius-xl: var(--radius);
   --radius-lg: calc(var(--radius) - 2px);
   --radius-md: calc(var(--radius) - 4px);
@@ -90,4 +90,66 @@ body {
   background: rgba(15, 15, 20, 0.4);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Utilitários de formulário ─── */
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--secondary);
+  padding: 0.6rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.btn-primary {
+  border-radius: 0.75rem;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  border-radius: 0.75rem;
+  background-color: var(--secondary);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-secondary:hover {
+  background-color: var(--muted);
 }
