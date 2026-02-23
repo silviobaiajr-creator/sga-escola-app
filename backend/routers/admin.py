@@ -390,6 +390,19 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
 
 @router.post("/bncc/upload-csv")
 async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    try:
+        return await _upload_bncc_csv_logic(file, db)
+    except Exception as e:
+        import traceback
+        trace = traceback.format_exc()
+        return {
+            "inserted": 0,
+            "updated": 0,
+            "errors": [f"ERRO FATAL NO SERVIDOR: {str(e)}", trace],
+            "total_processed": 0
+        }
+
+async def _upload_bncc_csv_logic(file: UploadFile, db: Session):
     """
     CSV obrigatório: codigo, descricao, disciplina, ano
     Colunas opcionais: bimestre, area, objeto_conhecimento
