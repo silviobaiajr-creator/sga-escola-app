@@ -31,13 +31,13 @@ export const getStudents = (params?: { class_name?: string; limit?: number }) =>
 // ─────────────────────────────────────────
 // ADMIN
 // ─────────────────────────────────────────
-export const getClasses = () => api.get("/api/admin/classes");
-export const getClassesYears = () => api.get("/api/admin/classes/years");
+export const getClasses = (all: boolean = false) => api.get(`/api/admin/classes${all ? '?all=true' : ''}`);
+export const getClassesYears = (all: boolean = false) => api.get(`/api/admin/classes/years${all ? '?all=true' : ''}`);
 export const createClass = (data: object) => api.post("/api/admin/classes", data);
 export const updateClass = (id: number, data: object) => api.put(`/api/admin/classes/${id}`, data);
 export const deleteClass = (id: number) => api.delete(`/api/admin/classes/${id}`);
 
-export const getDisciplines = () => api.get("/api/admin/disciplines");
+export const getDisciplines = (all: boolean = false) => api.get(`/api/admin/disciplines${all ? '?all=true' : ''}`);
 export const createDiscipline = (data: object) => api.post("/api/admin/disciplines", data);
 export const updateDiscipline = (id: number, data: object) => api.put(`/api/admin/disciplines/${id}`, data);
 export const deleteDiscipline = (id: number) => api.delete(`/api/admin/disciplines/${id}`);

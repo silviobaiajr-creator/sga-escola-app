@@ -57,16 +57,17 @@ class TeacherClassCreate(BaseModel):
 
 @router.get("/classes")
 def list_classes(
+    all: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     q = db.query(models.SetupClass).order_by(models.SetupClass.class_name)
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" and not all:
         q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.class_id == models.SetupClass.id)
         q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
         
     rows = q.all()
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" and not all:
         rows = list({r.id: r for r in rows}.values())
 
     return [
@@ -80,12 +81,13 @@ def list_classes(
 
 @router.get("/classes/years")
 def list_classes_years(
+    all: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """Retorna os anos (year_level) distintos cadastrados, ordenados"""
     q = db.query(models.SetupClass.year_level).filter(models.SetupClass.year_level.isnot(None))
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" and not all:
         q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.class_id == models.SetupClass.id)
         q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
         
@@ -125,16 +127,17 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
 
 @router.get("/disciplines")
 def list_disciplines(
+    all: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     q = db.query(models.SetupDiscipline).order_by(models.SetupDiscipline.discipline_name)
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" and not all:
         q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.discipline_id == models.SetupDiscipline.id)
         q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
         
     rows = q.all()
-    if current_user.role == "teacher":
+    if current_user.role == "teacher" and not all:
         rows = list({r.id: r for r in rows}.values())
 
     return [

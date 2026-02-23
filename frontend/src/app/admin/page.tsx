@@ -68,7 +68,7 @@ function ClassesTab() {
 
     const load = useCallback(async () => {
         setLoading(true);
-        try { const r = await getClasses(); setItems(r.data); }
+        try { const r = await getClasses(true); setItems(r.data); }
         catch { } finally { setLoading(false); }
     }, []);
 
@@ -155,7 +155,7 @@ function DisciplinesTab() {
 
     const load = useCallback(async () => {
         setLoading(true);
-        try { const r = await getDisciplines(); setItems(r.data); }
+        try { const r = await getDisciplines(true); setItems(r.data); }
         catch { } finally { setLoading(false); }
     }, []);
     useEffect(() => { load(); }, [load]);
@@ -503,17 +503,17 @@ function SpecificCompetenciesTab() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [compRes, discRes, yearsRes] = await Promise.all([
+            const [compRes, rDiscs, rYears] = await Promise.all([
                 getCompetencies({
                     discipline_id: filterDiscipline || undefined,
                     year_grade: filterYear || undefined
                 }),
-                getDisciplines(),
-                import("@/lib/api").then(m => m.getClassesYears())
+                getDisciplines(true),
+                import("@/lib/api").then(m => m.getClassesYears(true))
             ]);
             setItems(compRes.data);
-            setDisciplines(discRes.data);
-            setAvailableYears(yearsRes.data || []);
+            setDisciplines(rDiscs.data);
+            setAvailableYears(rYears.data || []);
         } catch { } finally { setLoading(false); }
     }, [filterDiscipline, filterYear]);
 
@@ -640,7 +640,7 @@ function TeacherClassTab() {
         setLoading(true);
         try {
             const [rLinks, rUsers, rClasses, rDiscs] = await Promise.all([
-                getTeacherClass(), getUsers(), getClasses(), getDisciplines()
+                getTeacherClass(), getUsers(), getClasses(true), getDisciplines(true)
             ]);
             setLinks(rLinks.data);
             setTeachers(rUsers.data.filter((u: any) => u.role === "teacher" || u.role === "admin" || u.role === "coordinator")); // Na vida real admins tbm podem dar aula
