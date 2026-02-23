@@ -308,9 +308,13 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
             continue
 
         try:
-            ano = int(ano_str)
+            import re
+            digits = re.sub(r'\D', '', ano_str)
+            if not digits:
+                raise ValueError
+            ano = int(digits)
         except ValueError:
-            errors.append(f"Linha {i}: ano '{ano_str}' inválido. Deve ser um número inteiro.")
+            errors.append(f"Linha {i}: ano '{ano_str}' inválido. Não contém um número inteiro identificável.")
             continue
             
         # Mapeamento do turno para o banco
@@ -401,9 +405,13 @@ async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(ge
             continue
 
         try:
-            ano = int(ano_str)
+            import re
+            digits = re.sub(r'\D', '', ano_str)
+            if not digits:
+                raise ValueError
+            ano = int(digits)
         except ValueError:
-            errors.append(f"Linha {i}: ano '{ano_str}' inválido. Deve ser um número inteiro.")
+            errors.append(f"Linha {i}: ano '{ano_str}' inválido. Não contém um número inteiro identificável.")
             continue
 
         # Verificar se a disciplina existe e criar se não existir
