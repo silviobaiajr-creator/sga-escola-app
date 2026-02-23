@@ -428,6 +428,7 @@ async def _upload_bncc_csv_logic(file: UploadFile, db: Session):
     inserted = 0
     updated  = 0
     errors   = []
+    processed_codes = {}
 
     for i, row in enumerate(reader, start=2):
         codigo     = (row.get("codigo") or row.get("bncc_code") or "").strip()
@@ -456,7 +457,11 @@ async def _upload_bncc_csv_logic(file: UploadFile, db: Session):
             db.add(disc)
             db.flush()
 
-        existing = db.query(models.BnccLibrary).get(codigo)
+        existing = processed_codes.get(codigo)
+        if not existing:
+            existing = db.query(models.BnccLibrary).get(codigo)
+            if existing:
+                processed_codes[codigo] = existing
         
         bimestre = row.get("bimestre") or row.get("bimester")
         area = row.get("area") or ""
@@ -483,6 +488,7 @@ async def _upload_bncc_csv_logic(file: UploadFile, db: Session):
                 object_of_knowledge=str(obj_conhecimento).strip() if obj_conhecimento else None
             )
             db.add(bncc)
+            processed_codes[codigo] = bncc
             inserted += 1
 
     db.commit()
