@@ -62,6 +62,14 @@ export const uploadStudentsCSV = (file: File) => {
     });
 };
 
+export const uploadBnccCSV = (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post("/api/admin/bncc/upload-csv", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+};
+
 // ─────────────────────────────────────────
 // PLANEJAMENTO
 // ─────────────────────────────────────────

@@ -299,11 +299,12 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
             errors.append(f"Linha {i}: campos obrigatórios incompletos (nome, id_aluno, turma).")
             continue
 
-        # Verificar se a turma existe
+        # Verificar se a turma existe e criar se não existir
         cls = db.query(models.SetupClass).filter_by(class_name=turma).first()
         if not cls:
-            errors.append(f"Linha {i}: turma '{turma}' não encontrada no sistema.")
-            continue
+            cls = models.SetupClass(class_name=turma)
+            db.add(cls)
+            db.flush()
 
         existing = db.query(models.Student).get(id_al)
         if existing:
@@ -333,6 +334,81 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
             if row.get("nr_matricula"):
                 student.enrollment_number = row["nr_matricula"].strip()
             db.add(student)
+            inserted += 1
+
+    db.commit()
+    return {
+        "inserted": inserted,
+        "updated":  updated,
+        "errors":   errors,
+        "total_processed": inserted + updated
+    }
+
+
+# ─────────────────────────────────────────
+# UPLOAD CSV DE HABILIDADES (BNCC)
+# ─────────────────────────────────────────
+
+@router.post("/bncc/upload-csv")
+async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    CSV obrigatório: codigo, descricao, disciplina
+    Colunas opcionais: bimestre, ano, area, objeto_conhecimento
+    """
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo .csv")
+
+    content = await file.read()
+    decoded = content.decode("utf-8-sig")  # remove BOM se houver
+    reader  = csv.DictReader(io.StringIO(decoded))
+
+    inserted = 0
+    updated  = 0
+    errors   = []
+
+    for i, row in enumerate(reader, start=2):
+        codigo     = (row.get("codigo") or row.get("bncc_code") or "").strip()
+        descricao  = (row.get("descricao") or row.get("skill_description") or "").strip()
+        disciplina = (row.get("disciplina") or row.get("discipline_name") or "").strip()
+
+        if not codigo or not descricao or not disciplina:
+            errors.append(f"Linha {i}: campos obrigatórios incompletos (codigo, descricao, disciplina).")
+            continue
+
+        # Verificar se a disciplina existe e criar se não existir
+        disc = db.query(models.SetupDiscipline).filter_by(discipline_name=disciplina).first()
+        if not disc:
+            disc = models.SetupDiscipline(discipline_name=disciplina)
+            db.add(disc)
+            db.flush()
+
+        existing = db.query(models.BnccLibrary).get(codigo)
+        
+        bimestre = row.get("bimestre") or row.get("bimester")
+        ano_str = row.get("ano") or row.get("year_grade")
+        ano = int(ano_str.strip()) if ano_str and ano_str.strip().isdigit() else None
+        area = row.get("area") or ""
+        obj_conhecimento = row.get("objeto_conhecimento") or row.get("object_of_knowledge") or ""
+
+        if existing:
+            existing.skill_description = descricao
+            existing.discipline_id = disc.id
+            if bimestre is not None: existing.bimester = str(bimestre).strip()
+            if ano is not None: existing.year_grade = ano
+            if area: existing.area = str(area).strip()
+            if obj_conhecimento: existing.object_of_knowledge = str(obj_conhecimento).strip()
+            updated += 1
+        else:
+            bncc = models.BnccLibrary(
+                bncc_code=codigo,
+                skill_description=descricao,
+                discipline_id=disc.id,
+                bimester=str(bimestre).strip() if bimestre else None,
+                year_grade=ano,
+                area=str(area).strip() if area else None,
+                object_of_knowledge=str(obj_conhecimento).strip() if obj_conhecimento else None
+            )
+            db.add(bncc)
             inserted += 1
 
     db.commit()

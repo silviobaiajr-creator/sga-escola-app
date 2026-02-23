@@ -13,7 +13,7 @@ import {
     getUsers, createUser, toggleUserActive,
     getCompetencies, createCompetency, deleteCompetency,
     getTeacherClass, createTeacherClass, deleteTeacherClass,
-    uploadStudentsCSV
+    uploadStudentsCSV, uploadBnccCSV
 } from "@/lib/api";
 
 // ─────────────────────────────────────────
@@ -324,11 +324,18 @@ function UsersTab() {
 // ABA: UPLOAD CSV
 // ─────────────────────────────────────────
 function CSVUploadTab() {
+    const [uploadType, setUploadType] = useState<"students" | "bncc">("students");
     const [file, setFile] = useState<File | null>(null);
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Limpar ao mudar o tipo de upload
+    useEffect(() => {
+        setFile(null);
+        setResult(null);
+    }, [uploadType]);
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault(); setDragOver(false);
@@ -341,7 +348,9 @@ function CSVUploadTab() {
         if (!file) return;
         setLoading(true); setResult(null);
         try {
-            const r = await uploadStudentsCSV(file);
+            const r = uploadType === "students"
+                ? await uploadStudentsCSV(file)
+                : await uploadBnccCSV(file);
             setResult(r.data);
         } catch (e: any) {
             setResult({ error: e?.response?.data?.detail || "Erro no upload." });
@@ -350,18 +359,52 @@ function CSVUploadTab() {
 
     return (
         <div className="space-y-6">
+            {/* Seleção do Tipo */}
+            <div className="flex gap-2">
+                <button
+                    onClick={() => setUploadType("students")}
+                    className={`flex-1 rounded-xl px-4 py-3 text-sm font-medium border transition-colors ${uploadType === "students" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card hover:bg-muted"}`}
+                >
+                    Alunos
+                </button>
+                <button
+                    onClick={() => setUploadType("bncc")}
+                    className={`flex-1 rounded-xl px-4 py-3 text-sm font-medium border transition-colors ${uploadType === "bncc" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card hover:bg-muted"}`}
+                >
+                    Habilidades BNCC
+                </button>
+            </div>
+
             {/* Instrução */}
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
-                <p className="text-sm font-medium text-blue-400 mb-1">Formato do CSV</p>
-                <p className="text-xs text-muted-foreground">
-                    Colunas obrigatórias: <code className="rounded bg-secondary px-1">nome</code>,{" "}
-                    <code className="rounded bg-secondary px-1">id_aluno</code>,{" "}
-                    <code className="rounded bg-secondary px-1">turma</code>
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                    Colunas opcionais: <code className="rounded bg-secondary px-1">data_nascimento</code>{" "}
-                    (YYYY-MM-DD), <code className="rounded bg-secondary px-1">nr_matricula</code>
-                </p>
+                <p className="text-sm font-medium text-blue-400 mb-1">Formato do CSV ({uploadType === "students" ? "Alunos" : "Habilidades BNCC"})</p>
+                {uploadType === "students" ? (
+                    <>
+                        <p className="text-xs text-muted-foreground">
+                            Colunas obrigatórias: <code className="rounded bg-secondary px-1">nome</code>,{" "}
+                            <code className="rounded bg-secondary px-1">id_aluno</code>,{" "}
+                            <code className="rounded bg-secondary px-1">turma</code>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Colunas opcionais: <code className="rounded bg-secondary px-1">data_nascimento</code>{" "}
+                            (YYYY-MM-DD), <code className="rounded bg-secondary px-1">nr_matricula</code>
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-xs text-muted-foreground">
+                            Colunas obrigatórias: <code className="rounded bg-secondary px-1">codigo</code>,{" "}
+                            <code className="rounded bg-secondary px-1">descricao</code>,{" "}
+                            <code className="rounded bg-secondary px-1">disciplina</code>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Colunas opcionais: <code className="rounded bg-secondary px-1">bimestre</code>,{" "}
+                            <code className="rounded bg-secondary px-1">ano</code>,{" "}
+                            <code className="rounded bg-secondary px-1">area</code>,{" "}
+                            <code className="rounded bg-secondary px-1">objeto_conhecimento</code>
+                        </p>
+                    </>
+                )}
             </div>
 
             {/* Drop Zone */}
@@ -391,7 +434,7 @@ function CSVUploadTab() {
                 <button onClick={handleUpload} disabled={loading}
                     className="btn-primary w-full flex items-center justify-center gap-2 py-3">
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {loading ? "Importando..." : "Importar Alunos"}
+                    {loading ? "Importando..." : `Importar ${uploadType === "students" ? "Alunos" : "Habilidades"}`}
                 </button>
             )}
 
