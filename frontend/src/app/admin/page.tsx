@@ -617,6 +617,127 @@ function SpecificCompetenciesTab() {
 }
 
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// ABA: PROFESSOR X TURMA X DISCIPLINA (VÍNCULOS)
+// ─────────────────────────────────────────
+
+function TeacherClassTab() {
+    const [links, setLinks] = useState<any[]>([]);
+    const [teachers, setTeachers] = useState<any[]>([]);
+    const [classes, setClasses] = useState<any[]>([]);
+    const [disciplines, setDisciplines] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const [form, setForm] = useState({
+        teacher_id: "",
+        class_id: "",
+        discipline_id: "",
+        school_year: new Date().getFullYear()
+    });
+
+    const loadAll = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [rLinks, rUsers, rClasses, rDiscs] = await Promise.all([
+                getTeacherClass(), getUsers(), getClasses(), getDisciplines()
+            ]);
+            setLinks(rLinks.data);
+            setTeachers(rUsers.data.filter((u: any) => u.role === "teacher" || u.role === "admin" || u.role === "coordinator")); // Na vida real admins tbm podem dar aula
+            setClasses(rClasses.data);
+            setDisciplines(rDiscs.data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { loadAll(); }, [loadAll]);
+
+    const handleAdd = async () => {
+        if (!form.teacher_id || !form.class_id || !form.discipline_id) {
+            alert("Selecione Professor, Turma e Disciplina.");
+            return;
+        }
+        setSaving(true);
+        try {
+            await createTeacherClass({
+                teacher_id: form.teacher_id,
+                class_id: parseInt(form.class_id),
+                discipline_id: parseInt(form.discipline_id),
+                school_year: form.school_year
+            });
+            // reset form partly
+            setForm(f => ({ ...f, discipline_id: "" })); // Deixa prof e turma p/ facilitar msma turma
+            loadAll();
+        } catch (e: any) {
+            alert(e?.response?.data?.detail || "Erro ao vincular.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!confirm("Remover este vínculo?")) return;
+        try {
+            await deleteTeacherClass(id);
+            loadAll();
+        } catch (e: any) {
+            alert("Erro ao remover vínculo.");
+        }
+    };
+
+    // Helper p/ achar os nomes
+    const getT = (id: string) => teachers.find(t => t.id === id)?.full_name || "Desconhecido";
+    const getC = (id: number) => classes.find(c => c.id === id)?.class_name || "Desconhecida";
+    const getD = (id: number) => disciplines.find(d => d.id === id)?.name || "Desconhecida";
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-4 sm:flex-row">
+                <select className="input flex-1" value={form.teacher_id} onChange={e => setForm({ ...form, teacher_id: e.target.value })}>
+                    <option value="">Selecione o Professor</option>
+                    {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name || t.username}</option>)}
+                </select>
+                <select className="input flex-1" value={form.class_id} onChange={e => setForm({ ...form, class_id: e.target.value })}>
+                    <option value="">Selecione a Turma</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.class_name}</option>)}
+                </select>
+                <select className="input flex-1" value={form.discipline_id} onChange={e => setForm({ ...form, discipline_id: e.target.value })}>
+                    <option value="">Selecione a Disciplina</option>
+                    {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <button onClick={handleAdd} disabled={saving || !form.teacher_id || !form.class_id || !form.discipline_id}
+                    className="btn-primary flex flex-shrink-0 items-center justify-center gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Vincular
+                </button>
+            </div>
+
+            {loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                : links.length === 0 ? <EmptyState message="Nenhum vínculo cadastrado." /> : (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {links.map((lk) => (
+                            <div key={lk.id} className="flex items-center justify-between rounded-xl border border-border bg-card/60 p-3">
+                                <div>
+                                    <p className="text-sm font-medium">{getT(lk.teacher_id)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        <span className="font-semibold">{getC(lk.class_id)}</span> — {getD(lk.discipline_id)}
+                                    </p>
+                                </div>
+                                <button onClick={() => handleDelete(lk.id)} className="text-muted-foreground hover:text-red-400">
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────
 // PÁGINA PRINCIPAL ADMIN
 // ─────────────────────────────────────────
 export default function AdminPage() {
@@ -662,12 +783,7 @@ export default function AdminPage() {
                     {activeTab === "professores" && <UsersTab />}
                     {activeTab === "csv" && <CSVUploadTab />}
                     {activeTab === "competencias" && <SpecificCompetenciesTab />}
-                    {activeTab === "vinculos" && (
-                        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-                            <Layers className="mb-3 h-10 w-10 opacity-30" />
-                            <p className="text-sm">Em breve: Vínculos Professor ↔ Turma ↔ Disciplina</p>
-                        </div>
-                    )}
+                    {activeTab === "vinculos" && <TeacherClassTab />}
                 </motion.div>
             </AnimatePresence>
         </div>

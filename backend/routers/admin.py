@@ -10,6 +10,7 @@ import csv, io
 
 from ..database import get_db
 from .. import models
+from .auth import get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -55,8 +56,19 @@ class TeacherClassCreate(BaseModel):
 # ─────────────────────────────────────────
 
 @router.get("/classes")
-def list_classes(db: Session = Depends(get_db)):
-    rows = db.query(models.SetupClass).order_by(models.SetupClass.class_name).all()
+def list_classes(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    q = db.query(models.SetupClass).order_by(models.SetupClass.class_name)
+    if current_user.role == "teacher":
+        q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.class_id == models.SetupClass.id)
+        q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
+        
+    rows = q.all()
+    if current_user.role == "teacher":
+        rows = list({r.id: r for r in rows}.values())
+
     return [
         {
             "id": r.id, "class_name": r.class_name,
@@ -67,9 +79,17 @@ def list_classes(db: Session = Depends(get_db)):
     ]
 
 @router.get("/classes/years")
-def list_classes_years(db: Session = Depends(get_db)):
+def list_classes_years(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """Retorna os anos (year_level) distintos cadastrados, ordenados"""
-    years = db.query(models.SetupClass.year_level).filter(models.SetupClass.year_level.isnot(None)).distinct().order_by(models.SetupClass.year_level).all()
+    q = db.query(models.SetupClass.year_level).filter(models.SetupClass.year_level.isnot(None))
+    if current_user.role == "teacher":
+        q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.class_id == models.SetupClass.id)
+        q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
+        
+    years = q.distinct().order_by(models.SetupClass.year_level).all()
     return [y[0] for y in years if y[0] is not None]
 
 @router.post("/classes", status_code=status.HTTP_201_CREATED)
@@ -104,8 +124,19 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────
 
 @router.get("/disciplines")
-def list_disciplines(db: Session = Depends(get_db)):
-    rows = db.query(models.SetupDiscipline).order_by(models.SetupDiscipline.discipline_name).all()
+def list_disciplines(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    q = db.query(models.SetupDiscipline).order_by(models.SetupDiscipline.discipline_name)
+    if current_user.role == "teacher":
+        q = q.join(models.TeacherClassDiscipline, models.TeacherClassDiscipline.discipline_id == models.SetupDiscipline.id)
+        q = q.filter(models.TeacherClassDiscipline.teacher_id == current_user.id)
+        
+    rows = q.all()
+    if current_user.role == "teacher":
+        rows = list({r.id: r for r in rows}.values())
+
     return [
         {
             "id": r.id, "name": r.discipline_name,

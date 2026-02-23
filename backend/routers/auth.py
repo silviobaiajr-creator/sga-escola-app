@@ -119,12 +119,7 @@ def login(payload: dict, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/me")
-def get_me(
-    token: str = Depends(oauth2_scheme),
-    db:    Session = Depends(get_db)
-):
-    """Retorna o usuário autenticado a partir do Bearer token."""
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
     if not token:
         raise HTTPException(status_code=401, detail="Não autenticado.")
     payload = verify_token(token)
@@ -141,5 +136,13 @@ def get_me(
     user = db.query(models.User).filter(models.User.id == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    
+    if user.is_active is False:
+        raise HTTPException(status_code=403, detail="Usuário inativo.")
 
+    return user
+
+@router.get("/me")
+def get_me(user: models.User = Depends(get_current_user)):
+    """Retorna o usuário autenticado a partir do Bearer token."""
     return user_to_dict(user)

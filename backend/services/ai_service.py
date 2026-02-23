@@ -97,30 +97,27 @@ def generate_objectives(
     year_info     = f"Ano Escolar: {year_level}º ano" if year_level else ""
 
     prompt = f"""
-Você é um **Consultor Pedagógico Sênior** especializado em currículo baseado na BNCC.
+Você é um **Consultor Pedagógico Sênior**.
 
 1. CONTEXTO DA HABILIDADE:
-   Código BNCC: {skill_code}
-   Habilidade: {skill_description}
+   BNCC: {skill_code} - {skill_description}
    Disciplina: {discipline_name or 'Geral'}
    {year_info}
    {bimester_info}
 {comp_section}
-2. SUA TAREFA: Gere {quantity} Objetivos de Aprendizagem em ORDEM PROGRESSIVA.
-   - Objetivo 1: introduz/explora o conceito fundamental.
-   - Objetivo final: consolida a habilidade completa.
-   - Cada objetivo deve ser BASE para o próximo.
-   - Os objetivos JUNTOS devem cobrir a totalidade da habilidade BNCC.
-   - OBRIGATÓRIO: comece com verbo da Taxonomia de Bloom (identificar, analisar, produzir...).
-   - MÁXIMO 18 palavras por objetivo.
-   - Se houver competências específicas, os objetivos devem contemplá-las explicitamente.
+2. SUA TAREFA: Gere EXATAMENTE {quantity} Objetivos de Aprendizagem em ORDEM PROGRESSIVA.
+   - REGRA DE OURO 1: GERE EXATAMENTE {quantity} OBJETIVOS. NEM A MAIS, NEM A MENOS.
+   - REGRA DE OURO 2: Se houver competências adicionais fornecidas, você DEVE conectar os objetivos a elas, demonstrando o raciocínio.
+   - REGRA 3: Comece com verbos da Taxonomia de Bloom (identificar, analisar...).
+   - REGRA 4: MÁXIMO 18 palavras por objetivo (seja prático e direto ao ponto).
 
-3. FORMATO DE SAÍDA OBRIGATÓRIO:
-EXPLICACAO: [1 parágrafo explicando POR QUÊ cada objetivo foi escolhido e como eles se conectam às competências específicas]
+3. FORMATO DE SAÍDA OBRIGATÓRIO (PARA ECONOMIZAR TOKENS):
+EXPLICACAO: [Resuma a integração com as competências e motivo da progressão de forma EXTREMAMENTE CURTA. Máximo de 2 ou 3 frases. Seja objetivo.]
 ###
-OBJ1: [texto do objetivo 1]|[explicação pedagógica curta do objetivo 1]
-OBJ2: [texto do objetivo 2]|[explicação pedagógica curta do objetivo 2]
-OBJ3: [texto do objetivo 3]|[explicação pedagógica curta do objetivo 3]
+OBJ1: [texto 1]|[justificativa super curta 1]
+OBJ2: [texto 2]|[justificativa super curta 2]
+...
+OBJ{quantity}: [texto {quantity}]|[justificativa super curta {quantity}]
 """
 
     try:
