@@ -83,8 +83,8 @@ export function useAuth() {
     const logout = useCallback(() => {
         clearAuth();
         setState({ token: null, user: null, isLoading: false });
-        router.push("/login");
-    }, [router]);
+        window.location.href = "/login";
+    }, []);
 
     return { ...state, login, logout };
 }

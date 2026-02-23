@@ -2,7 +2,7 @@
 Rotas de Administração — Gerenciar turmas, disciplinas, usuários,
 competências específicas, vínculos professor-turma e upload CSV de alunos.
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -57,7 +57,7 @@ class TeacherClassCreate(BaseModel):
 
 @router.get("/classes")
 def list_classes(
-    all: bool = False,
+    all: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -81,7 +81,7 @@ def list_classes(
 
 @router.get("/classes/years")
 def list_classes_years(
-    all: bool = False,
+    all: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -127,7 +127,7 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
 
 @router.get("/disciplines")
 def list_disciplines(
-    all: bool = False,
+    all: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
