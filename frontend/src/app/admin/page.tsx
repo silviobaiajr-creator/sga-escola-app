@@ -383,7 +383,8 @@ function CSVUploadTab() {
                         <p className="text-xs text-muted-foreground">
                             Colunas obrigatórias: <code className="rounded bg-secondary px-1">nome</code>,{" "}
                             <code className="rounded bg-secondary px-1">id_aluno</code>,{" "}
-                            <code className="rounded bg-secondary px-1">turma</code>
+                            <code className="rounded bg-secondary px-1">turma</code>,{" "}
+                            <code className="rounded bg-secondary px-1">ano</code>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                             Colunas opcionais: <code className="rounded bg-secondary px-1">data_nascimento</code>{" "}
@@ -395,11 +396,11 @@ function CSVUploadTab() {
                         <p className="text-xs text-muted-foreground">
                             Colunas obrigatórias: <code className="rounded bg-secondary px-1">codigo</code>,{" "}
                             <code className="rounded bg-secondary px-1">descricao</code>,{" "}
-                            <code className="rounded bg-secondary px-1">disciplina</code>
+                            <code className="rounded bg-secondary px-1">disciplina</code>,{" "}
+                            <code className="rounded bg-secondary px-1">ano</code>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                             Colunas opcionais: <code className="rounded bg-secondary px-1">bimestre</code>,{" "}
-                            <code className="rounded bg-secondary px-1">ano</code>,{" "}
                             <code className="rounded bg-secondary px-1">area</code>,{" "}
                             <code className="rounded bg-secondary px-1">objeto_conhecimento</code>
                         </p>
