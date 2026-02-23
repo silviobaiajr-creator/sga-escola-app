@@ -453,6 +453,7 @@ async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(ge
             existing.skill_description = descricao
             existing.discipline_id = disc.id
             existing.year_grade = ano
+            existing.grade = f"{ano}º Ano"
             if bimestre is not None: existing.bimester = str(bimestre).strip()
             if area: existing.area = str(area).strip()
             if obj_conhecimento: existing.object_of_knowledge = str(obj_conhecimento).strip()
@@ -464,6 +465,7 @@ async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(ge
                 discipline_id=disc.id,
                 bimester=str(bimestre).strip() if bimestre else None,
                 year_grade=ano,
+                grade=f"{ano}º Ano",
                 area=str(area).strip() if area else None,
                 object_of_knowledge=str(obj_conhecimento).strip() if obj_conhecimento else None
             )
