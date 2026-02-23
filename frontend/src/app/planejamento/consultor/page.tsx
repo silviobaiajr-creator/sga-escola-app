@@ -6,7 +6,7 @@ import {
     Lightbulb, Sparkles, BookOpen, ChevronRight, Loader2,
     CheckCircle2, Save, Send, Info, RotateCcw, Plus, Minus
 } from "lucide-react";
-import { getBnccSkills, getDisciplines, getClasses, generateObjectives, submitObjective } from "@/lib/api";
+import { getBnccSkills, getDisciplines, getClassesYears, generateObjectives, submitObjective } from "@/lib/api";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -121,11 +121,12 @@ export default function ConsultorPage() {
 
     // Seleções
     const [disciplines, setDisciplines] = useState<any[]>([]);
+    const [availableYears, setAvailableYears] = useState<number[]>([]);
     const [selectedDisc, setSelectedDisc] = useState<any>(null);
     const [skills, setSkills] = useState<Skill[]>([]);
     const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
     const [selectedBimester, setSelectedBimester] = useState<number | null>(null);
-    const [yearLevel, setYearLevel] = useState<number>(6);
+    const [yearLevel, setYearLevel] = useState<number>(0);
     const [quantity, setQuantity] = useState<number>(3);
 
     // Resultados
@@ -136,9 +137,14 @@ export default function ConsultorPage() {
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // Carregar disciplinas
+    // Carregar disciplinas e anos dinâmicos
     useEffect(() => {
         getDisciplines().then(r => setDisciplines(r.data)).catch(() => { });
+        getClassesYears().then(r => {
+            const yList = r.data || [];
+            setAvailableYears(yList);
+            if (yList.length > 0) setYearLevel(yList[0]);
+        }).catch(() => { });
     }, []);
 
     // Carregar habilidades
@@ -233,7 +239,11 @@ export default function ConsultorPage() {
                                 <div>
                                     <label className="text-xs text-muted-foreground mb-1 block">Ano Escolar</label>
                                     <select className="input" value={yearLevel} onChange={e => setYearLevel(Number(e.target.value))}>
-                                        {[6, 7, 8, 9].map(y => <option key={y} value={y}>{y}º Ano</option>)}
+                                        {availableYears.length === 0 ? (
+                                            <option value={0}>Nenhum ano escolar cadastrado</option>
+                                        ) : (
+                                            availableYears.map(y => <option key={y} value={y}>{y}º Ano</option>)
+                                        )}
                                     </select>
                                 </div>
                             </div>
