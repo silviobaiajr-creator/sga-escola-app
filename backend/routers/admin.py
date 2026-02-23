@@ -289,8 +289,19 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
         raise HTTPException(status_code=400, detail="Envie um arquivo .csv")
 
     content = await file.read()
-    decoded = content.decode("utf-8-sig")  # remove BOM se houver
-    reader  = csv.DictReader(io.StringIO(decoded))
+    try:
+        decoded = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            decoded = content.decode("latin-1")
+        except UnicodeDecodeError:
+            decoded = content.decode("utf-8", errors="replace")
+
+    # Detectar o delimitador (Excel Pt-Br usa ponto-e-vírgula por padrão)
+    header_line = decoded.split("\n", 1)[0] if "\n" in decoded else decoded
+    delimiter = ";" if header_line.count(";") > header_line.count(",") else ","
+    
+    reader  = csv.DictReader(io.StringIO(decoded), delimiter=delimiter)
 
     inserted = 0
     updated  = 0
@@ -387,8 +398,19 @@ async def upload_bncc_csv(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Envie um arquivo .csv")
 
     content = await file.read()
-    decoded = content.decode("utf-8-sig")  # remove BOM se houver
-    reader  = csv.DictReader(io.StringIO(decoded))
+    try:
+        decoded = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            decoded = content.decode("latin-1")
+        except UnicodeDecodeError:
+            decoded = content.decode("utf-8", errors="replace")
+
+    # Detectar o delimitador (Excel Pt-Br usa ponto-e-vírgula por padrão)
+    header_line = decoded.split("\n", 1)[0] if "\n" in decoded else decoded
+    delimiter = ";" if header_line.count(";") > header_line.count(",") else ","
+
+    reader  = csv.DictReader(io.StringIO(decoded), delimiter=delimiter)
 
     inserted = 0
     updated  = 0
