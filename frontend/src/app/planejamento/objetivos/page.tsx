@@ -6,7 +6,7 @@ import {
     FileCheck2, CheckCircle2, XCircle, Loader2, ChevronDown,
     ChevronUp, AlertTriangle, BookOpen, Clock, Info
 } from "lucide-react";
-import { getDisciplines, getClasses, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel } from "@/lib/api";
+import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel } from "@/lib/api";
 
 // ─────────────────────────────────────────
 // STATUS BADGE
@@ -179,8 +179,9 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
 // ─────────────────────────────────────────
 export default function ObjetivosPage() {
     const [disciplines, setDisciplines] = useState<any[]>([]);
+    const [availableYears, setAvailableYears] = useState<number[]>([]);
     const [selectedDisc, setSelectedDisc] = useState<string>("");
-    const [yearLevel, setYearLevel] = useState<number>(6);
+    const [yearLevel, setYearLevel] = useState<number>(0); // 0 indica "não carregado ainda"
     const [bimester, setBimester] = useState<number>(1);
     const [objectives, setObjectives] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -192,6 +193,13 @@ export default function ObjetivosPage() {
 
     useEffect(() => {
         getDisciplines().then(r => setDisciplines(r.data)).catch(() => { });
+        getClassesYears().then(r => {
+            const yList = r.data || [];
+            setAvailableYears(yList);
+            if (yList.length > 0) {
+                setYearLevel(yList[0]);
+            }
+        }).catch(() => { });
     }, []);
 
     const load = async () => {
@@ -240,7 +248,11 @@ export default function ObjetivosPage() {
                     {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
                 <select className="input" value={yearLevel} onChange={e => setYearLevel(Number(e.target.value))}>
-                    {[6, 7, 8, 9].map(y => <option key={y} value={y}>{y}º Ano</option>)}
+                    {availableYears.length === 0 ? (
+                        <option value={0}>Nenhum ano escolar cadastrado</option>
+                    ) : (
+                        availableYears.map(y => <option key={y} value={y}>{y}º Ano</option>)
+                    )}
                 </select>
                 <select className="input" value={bimester} onChange={e => setBimester(Number(e.target.value))}>
                     {[1, 2, 3, 4].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}

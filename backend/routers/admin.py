@@ -66,6 +66,12 @@ def list_classes(db: Session = Depends(get_db)):
         for r in rows
     ]
 
+@router.get("/classes/years")
+def list_classes_years(db: Session = Depends(get_db)):
+    """Retorna os anos (year_level) distintos cadastrados, ordenados"""
+    years = db.query(models.SetupClass.year_level).filter(models.SetupClass.year_level.isnot(None)).distinct().order_by(models.SetupClass.year_level).all()
+    return [y[0] for y in years if y[0] is not None]
+
 @router.post("/classes", status_code=status.HTTP_201_CREATED)
 def create_class(body: ClassCreate, db: Session = Depends(get_db)):
     existing = db.query(models.SetupClass).filter_by(class_name=body.class_name).first()

@@ -485,6 +485,138 @@ function CSVUploadTab() {
 }
 
 // ─────────────────────────────────────────
+// ABA: COMPETÊNCIAS ESPECÍFICAS
+// ─────────────────────────────────────────
+function SpecificCompetenciesTab() {
+    const [items, setItems] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [disciplines, setDisciplines] = useState<any[]>([]);
+    const [availableYears, setAvailableYears] = useState<number[]>([]);
+
+    // Filtros
+    const [filterDiscipline, setFilterDiscipline] = useState<string>("");
+    const [filterYear, setFilterYear] = useState<string>("");
+
+    const [form, setForm] = useState({ discipline_id: "", year_grade: "", competency_number: 1, description: "" });
+    const [saving, setSaving] = useState(false);
+
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [compRes, discRes, yearsRes] = await Promise.all([
+                getCompetencies({
+                    discipline_id: filterDiscipline || undefined,
+                    year_grade: filterYear || undefined
+                }),
+                getDisciplines(),
+                import("@/lib/api").then(m => m.getClassesYears())
+            ]);
+            setItems(compRes.data);
+            setDisciplines(discRes.data);
+            setAvailableYears(yearsRes.data || []);
+        } catch { } finally { setLoading(false); }
+    }, [filterDiscipline, filterYear]);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    const handleAdd = async () => {
+        if (!form.discipline_id || !form.description) return;
+        setSaving(true);
+        try {
+            await createCompetency({
+                discipline_id: Number(form.discipline_id),
+                year_grade: form.year_grade ? Number(form.year_grade) : null,
+                competency_number: Number(form.competency_number),
+                description: form.description
+            });
+            setForm({ discipline_id: filterDiscipline || "", year_grade: filterYear || "", competency_number: form.competency_number + 1, description: "" });
+            loadData();
+        } catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
+        finally { setSaving(false); }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!confirm("Excluir esta competência específica?")) return;
+        try { await deleteCompetency(id); loadData(); }
+        catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
+    };
+
+    // Para encontrar o nome da disciplina na listagem
+    const getDiscName = (id: number) => disciplines.find(d => d.id === id)?.name || `ID: ${id}`;
+
+    return (
+        <div className="space-y-6">
+            {/* Form */}
+            <div className="rounded-2xl border border-border bg-card/60 p-4 space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <select value={form.discipline_id} onChange={e => setForm(f => ({ ...f, discipline_id: e.target.value }))} className="input">
+                        <option value="">Disciplina...</option>
+                        {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    <select value={form.year_grade} onChange={e => setForm(f => ({ ...f, year_grade: e.target.value }))} className="input">
+                        <option value="">Qualquer Ano (Todos)</option>
+                        {availableYears.map(y => <option key={y} value={y}>{y}º Ano</option>)}
+                    </select>
+                    <input type="number" min="1" value={form.competency_number} onChange={e => setForm(f => ({ ...f, competency_number: Number(e.target.value) }))}
+                        placeholder="Número (Ex: 1)" className="input" />
+                </div>
+                <div className="flex gap-3 items-end">
+                    <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="Descrição da Competência" className="input flex-1 resize-none h-11" rows={1} />
+                    <button onClick={handleAdd} disabled={saving || !form.discipline_id || !form.description}
+                        className="btn-primary flex items-center justify-center gap-2 h-11 px-6">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        Adicionar
+                    </button>
+                </div>
+            </div>
+
+            {/* List Header / Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-secondary/30 p-2 rounded-xl">
+                <p className="text-sm font-medium px-2">Competências Cadastradas ({items.length})</p>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <select value={filterDiscipline} onChange={e => setFilterDiscipline(e.target.value)} className="input h-9 text-xs sm:w-40">
+                        <option value="">Filtrar Disciplina</option>
+                        {disciplines.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="input h-9 text-xs sm:w-32">
+                        <option value="">Filtrar Ano</option>
+                        <option value="null">Geral (Sem ano)</option>
+                        {availableYears.map(y => <option key={y} value={y}>{y}º Ano</option>)}
+                    </select>
+                </div>
+            </div>
+
+            {/* List */}
+            {loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : items.length === 0 ? <EmptyState message="Nenhuma competência encontrada para este filtro." /> : (
+                <div className="space-y-2">
+                    {items.map((item) => (
+                        <div key={item.id} className="flex gap-3 rounded-xl border border-border bg-card/60 p-3">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-lg">
+                                {item.competency_number}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex gap-2 mb-1">
+                                    <Badge color="blue">{getDiscName(item.discipline_id)}</Badge>
+                                    <Badge color="purple">{item.year_grade ? `${item.year_grade}º Ano` : "Geral"}</Badge>
+                                </div>
+                                <p className="text-sm leading-relaxed text-foreground">{item.description}</p>
+                            </div>
+                            <button onClick={() => handleDelete(item.id)}
+                                className="text-muted-foreground hover:text-red-400 transition-colors self-start p-1">
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────
 // PÁGINA PRINCIPAL ADMIN
 // ─────────────────────────────────────────
 export default function AdminPage() {
@@ -529,10 +661,11 @@ export default function AdminPage() {
                     {activeTab === "disciplinas" && <DisciplinesTab />}
                     {activeTab === "professores" && <UsersTab />}
                     {activeTab === "csv" && <CSVUploadTab />}
-                    {(activeTab === "competencias" || activeTab === "vinculos") && (
+                    {activeTab === "competencias" && <SpecificCompetenciesTab />}
+                    {activeTab === "vinculos" && (
                         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
                             <Layers className="mb-3 h-10 w-10 opacity-30" />
-                            <p className="text-sm">Em breve: {activeTab === "competencias" ? "Gerenciar Competências Específicas" : "Vínculos Professor ↔ Turma ↔ Disciplina"}</p>
+                            <p className="text-sm">Em breve: Vínculos Professor ↔ Turma ↔ Disciplina</p>
                         </div>
                     )}
                 </motion.div>

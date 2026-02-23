@@ -32,6 +32,7 @@ export const getStudents = (params?: { class_name?: string; limit?: number }) =>
 // ADMIN
 // ─────────────────────────────────────────
 export const getClasses = () => api.get("/api/admin/classes");
+export const getClassesYears = () => api.get("/api/admin/classes/years");
 export const createClass = (data: object) => api.post("/api/admin/classes", data);
 export const updateClass = (id: number, data: object) => api.put(`/api/admin/classes/${id}`, data);
 export const deleteClass = (id: number) => api.delete(`/api/admin/classes/${id}`);
