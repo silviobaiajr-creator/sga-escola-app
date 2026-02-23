@@ -384,7 +384,8 @@ function CSVUploadTab() {
                             Colunas obrigatórias: <code className="rounded bg-secondary px-1">nome</code>,{" "}
                             <code className="rounded bg-secondary px-1">id_aluno</code>,{" "}
                             <code className="rounded bg-secondary px-1">turma</code>,{" "}
-                            <code className="rounded bg-secondary px-1">ano</code>
+                            <code className="rounded bg-secondary px-1">ano</code>,{" "}
+                            <code className="rounded bg-secondary px-1">turno</code>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                             Colunas opcionais: <code className="rounded bg-secondary px-1">data_nascimento</code>{" "}

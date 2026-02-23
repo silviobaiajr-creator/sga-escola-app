@@ -276,7 +276,7 @@ def delete_teacher_class(link_id: int, db: Session = Depends(get_db)):
 @router.post("/students/upload-csv")
 async def upload_students_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
-    CSV obrigatório: nome, id_aluno, turma, ano
+    CSV obrigatório: nome, id_aluno, turma, ano, turno
     Colunas opcionais: data_nascimento (YYYY-MM-DD), nr_matricula
     """
     if not file.filename.endswith(".csv"):
@@ -295,9 +295,10 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
         id_al   = (row.get("id_aluno") or row.get("student_id") or "").strip()
         turma   = (row.get("turma")  or row.get("class_name") or "").strip()
         ano_str = (row.get("ano") or row.get("year_level") or "").strip()
+        turno_br= (row.get("turno") or "").strip().lower()
 
-        if not nome or not id_al or not turma or not ano_str:
-            errors.append(f"Linha {i}: campos obrigatórios incompletos (nome, id_aluno, turma, ano).")
+        if not nome or not id_al or not turma or not ano_str or not turno_br:
+            errors.append(f"Linha {i}: campos obrigatórios incompletos (nome, id_aluno, turma, ano, turno).")
             continue
 
         try:
@@ -305,15 +306,22 @@ async def upload_students_csv(file: UploadFile = File(...), db: Session = Depend
         except ValueError:
             errors.append(f"Linha {i}: ano '{ano_str}' inválido. Deve ser um número inteiro.")
             continue
+            
+        # Mapeamento do turno para o banco
+        shift_map = {"manhã": "morning", "manha": "morning", "tarde": "afternoon", "noite": "evening"}
+        shift_val = shift_map.get(turno_br, "morning")  # default para morning se não reconhecer
 
         # Verificar se a turma existe e criar se não existir
         cls = db.query(models.SetupClass).filter_by(class_name=turma).first()
         if not cls:
-            cls = models.SetupClass(class_name=turma, year_level=ano)
+            cls = models.SetupClass(class_name=turma, year_level=ano, shift=shift_val)
             db.add(cls)
             db.flush()
-        elif not cls.year_level:
-            cls.year_level = ano
+        else:
+            if not cls.year_level:
+                cls.year_level = ano
+            if not cls.shift or cls.shift != shift_val:
+                cls.shift = shift_val
             db.flush()
 
         existing = db.query(models.Student).get(id_al)
