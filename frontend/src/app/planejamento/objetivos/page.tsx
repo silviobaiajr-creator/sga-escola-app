@@ -421,7 +421,7 @@ export default function ObjetivosPage() {
 
                     return (
                         <div className="space-y-8">
-                            {Object.entries(grouped).map(([code, data]) => (
+                            {Object.entries(grouped).map(([code, data]: [string, any]) => (
                                 <div key={code} className="space-y-4">
                                     <div className="px-1 border-b pb-2 cursor-pointer group">
                                         <h3 className="text-lg font-bold flex items-center gap-3">
@@ -430,7 +430,7 @@ export default function ObjetivosPage() {
                                         {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
                                     </div>
                                     <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
-                                        {data.items.map(o => (
+                                        {data.items.map((o: any) => (
                                             <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
                                         ))}
                                     </div>
@@ -442,7 +442,7 @@ export default function ObjetivosPage() {
 
                 return (
                     <div className="space-y-3">
-                        {displayList.map(o => (
+                        {displayList.map((o: any) => (
                             <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
                         ))}
                     </div>

@@ -6,7 +6,7 @@ import {
     Lightbulb, Sparkles, BookOpen, ChevronRight, Loader2,
     CheckCircle2, Save, Send, Info, RotateCcw, Plus, Minus
 } from "lucide-react";
-import { getBnccSkills, getDisciplines, getClassesYears, generateObjectives, submitObjective } from "@/lib/api";
+import { getBnccSkills, getDisciplines, getClassesYears, generateObjectives, submitObjective, generateRubrics } from "@/lib/api";
 
 // ─────────────────────────────────────────
 // TYPES
