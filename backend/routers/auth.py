@@ -81,7 +81,7 @@ def login(payload: dict, db: Session = Depends(get_db)):
             detail="Incorrect username or password"
         )
 
-    # Verificar senha — suporte a texto plano (legado) e bcrypt (futuro)
+    # Verificar senha — suporte a texto plano (legado), bcrypt e sha256
     password_ok = False
     stored = user.password or ""
 
@@ -93,6 +93,11 @@ def login(payload: dict, db: Session = Depends(get_db)):
             password_ok = pwd_ctx.verify(password, stored)
         except ImportError:
             password_ok = False
+    elif len(stored) == 64:
+        # sha256 hash
+        import hashlib
+        hashed_input = hashlib.sha256(password.encode()).hexdigest()
+        password_ok = (hashed_input == stored)
     else:
         # Texto plano (banco legado)
         password_ok = (password == stored)

@@ -35,7 +35,7 @@ function saveAuth(token: string, user: SgaUser) {
 function clearAuth() {
     localStorage.removeItem("sga_token");
     localStorage.removeItem("sga_user");
-    document.cookie = "sga_token=; path=/; max-age=0";
+    document.cookie = "sga_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict";
 }
 
 function readAuth(): { token: string | null; user: SgaUser | null } {
@@ -83,8 +83,8 @@ export function useAuth() {
     const logout = useCallback(() => {
         clearAuth();
         setState({ token: null, user: null, isLoading: false });
-        window.location.href = "/login";
-    }, []);
+        router.push("/login"); // Forçar o reload local
+    }, [router]);
 
     return { ...state, login, logout };
 }

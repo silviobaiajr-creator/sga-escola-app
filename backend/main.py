@@ -12,21 +12,8 @@ import pandas as pd
 from .database import engine, Base, get_db
 from . import models, schemas
 from .services import ai_service, analytics_service
-from .routers import admin, planning, analytics
+from .routers import admin, planning, analytics, auth
 
-# ── JWT mínimo (stdlib apenas — sem PyJWT) ──────────────────────────────────
-_JWT_SECRET = os.getenv("JWT_SECRET", "sga-h-secret-key-2026").encode()
-
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-def _make_token(payload: dict) -> str:
-    header  = _b64url(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    payload["exp"] = int(time.time()) + 60 * 60 * 24 * 7
-    body    = _b64url(json.dumps(payload).encode())
-    sig_in  = f"{header}.{body}".encode()
-    sig     = _b64url(hmac.digest(_JWT_SECRET, sig_in, hashlib.sha256))
-    return f"{header}.{body}.{sig}"
 
 app = FastAPI(
     title="SGA-H API v2",
@@ -53,62 +40,10 @@ app.add_middleware(
 # ─────────────────────────────────────────
 # REGISTRAR ROUTERS
 # ─────────────────────────────────────────
+app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(planning.router)
 app.include_router(analytics.router)
-
-
-# ─────────────────────────────────────────
-# AUTENTICAÇÃO (inline — sem dependência extra)
-# ─────────────────────────────────────────
-
-@app.post("/api/auth/login")
-def login(payload: dict, db: Session = Depends(get_db)):
-    """POST { username, password } → { access_token, user }"""
-    username: str = (payload.get("username") or "").strip()
-    password: str = payload.get("password") or ""
-
-    if not username or not password:
-        raise HTTPException(status_code=422, detail="username e password são obrigatórios.")
-
-    user = db.query(models.User).filter(models.User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-
-    # Suporta texto plano (banco legado) ou bcrypt
-    stored = user.password or ""
-    ok = False
-    if stored.startswith("$2b$") or stored.startswith("$2a$"):
-        try:
-            from passlib.context import CryptContext
-            ok = CryptContext(schemes=["bcrypt"], deprecated="auto").verify(password, stored)
-        except Exception:
-            ok = False
-    else:
-        ok = (password == stored)
-
-    if not ok:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-
-    if user.is_active is False:
-        raise HTTPException(status_code=403, detail="Usuário inativo.")
-
-    user_data = {
-        "id":        str(user.id),
-        "username":  user.username,
-        "full_name": user.full_name,
-        "email":     user.email,
-        "role":      user.role or "teacher",
-        "is_active": True if user.is_active is None else bool(user.is_active),
-    }
-    token = _make_token({"sub": str(user.id), **user_data})
-    return {"access_token": token, "token_type": "bearer", "user": user_data}
-
-
-@app.get("/api/auth/me")
-def me_route(db: Session = Depends(get_db)):
-    return {"message": "Use o header Authorization: Bearer <token>"}
-
 
 # ─────────────────────────────────────────
 # ROTAS BASE (legadas — mantidas para compatibilidade)

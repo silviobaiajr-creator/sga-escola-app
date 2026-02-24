@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/useAuth";
 
 const menuItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -42,6 +43,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+    const { user } = useAuth();
 
     const toggleExpanded = (name: string) => {
         setExpandedItems((prev) =>
@@ -141,15 +143,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {/* Bottom section */}
                 <div className="border-t border-border p-4">
                     <div className="rounded-xl bg-secondary p-3">
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
-                                P
+                        {user ? (
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                                    {(user.full_name || user.username || "?")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">{user.full_name || user.username}</p>
+                                    <p className="text-xs text-muted-foreground capitalize">
+                                        {user.role === "coordinator" ? "Coordenador" : user.role === "admin" ? "Admin" : "Professor"}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-medium">Professor</p>
-                                <p className="text-xs text-muted-foreground">Matemática · 6º Ano</p>
+                        ) : (
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                                    ?
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">Carregando...</p>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </aside>

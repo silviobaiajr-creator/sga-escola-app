@@ -689,7 +689,7 @@ function TeacherClassTab() {
     };
 
     // Helper p/ achar os nomes
-    const getT = (id: string) => teachers.find(t => t.id === id)?.full_name || "Desconhecido";
+    const getT = (id: string) => { const t = teachers.find(t => t.id === id); return t ? (t.full_name || t.username) : "Desconhecido"; };
     const getC = (id: number) => classes.find(c => c.id === id)?.class_name || "Desconhecida";
     const getD = (id: number) => disciplines.find(d => d.id === id)?.name || "Desconhecida";
 
