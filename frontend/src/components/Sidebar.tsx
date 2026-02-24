@@ -144,6 +144,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 </Link>
                             );
                         })}
+                    </nav>
                 </div>
 
                 {/* Bottom section */}
