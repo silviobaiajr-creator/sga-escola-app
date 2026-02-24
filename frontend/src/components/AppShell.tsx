@@ -47,7 +47,7 @@ export function AppShell({ children }: AppShellProps) {
                     </Link>
 
                     {/* Search Bar */}
-                    <div className="ml-4 flex flex-1 items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 max-w-md">
+                    <div className="ml-4 hidden md:flex flex-1 items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 max-w-md">
                         <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <input
                             type="text"
@@ -64,7 +64,7 @@ export function AppShell({ children }: AppShellProps) {
                         </button>
 
                         {/* User Avatar */}
-                        <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-1.5">
+                        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-1.5">
                             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white uppercase">
                                 {user ? (user.full_name || user.username || "?")[0] : "?"}
                             </div>

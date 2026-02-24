@@ -125,8 +125,10 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
         setActing(false);
     };
 
-    const lastEdit = r.approvals?.filter((a: any) => a.action === "edited").slice(-1)[0];
-    const canAct = r.status === "pending" && !r.approvals?.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+    const lastEditIndex = r.approvals ? r.approvals.map((a: any) => a.action).lastIndexOf("edited") : -1;
+    const lastEdit = lastEditIndex !== -1 ? r.approvals[lastEditIndex] : null;
+    const recentApprovals = r.approvals ? r.approvals.slice(lastEditIndex !== -1 ? lastEditIndex + 1 : 0) : [];
+    const canAct = r.status === "pending" && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
 
     return (
         <div className={`rounded-xl border p-3 ${levelColors[r.level] || ""}`}>
@@ -209,8 +211,10 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
         setIsEditing(false);
     };
 
-    const lastEdit = obj.approvals?.filter((a: any) => a.action === "edited").slice(-1)[0];
-    const canAct = obj.status === "pending" && !obj.approvals?.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+    const lastEditIndex = obj.approvals ? obj.approvals.map((a: any) => a.action).lastIndexOf("edited") : -1;
+    const lastEdit = lastEditIndex !== -1 ? obj.approvals[lastEditIndex] : null;
+    const recentApprovals = obj.approvals ? obj.approvals.slice(lastEditIndex !== -1 ? lastEditIndex + 1 : 0) : [];
+    const canAct = obj.status === "pending" && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
 
     // Lógica para status composto
     let compoundMsg = "";
@@ -451,21 +455,30 @@ export default function ObjetivosPage() {
 
                 return (
                     <div className="space-y-8">
-                        {Object.entries(grouped).map(([code, data]: [string, any]) => (
-                            <div key={code} className="space-y-4">
-                                <div className="px-1 border-b pb-2">
-                                    <h3 className="text-lg font-bold flex items-center gap-3">
-                                        <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{code}</span>
-                                    </h3>
-                                    {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
+                        {Object.entries(grouped).map(([code, data]: [string, any]) => {
+                            const statuses = data.items.map((i: any) => i.status);
+                            let skillStatus = "draft";
+                            if (statuses.includes("rejected")) skillStatus = "rejected";
+                            else if (statuses.includes("pending")) skillStatus = "pending";
+                            else if (statuses.every((s: string) => s === "approved")) skillStatus = "approved";
+
+                            return (
+                                <div key={code} className="space-y-4">
+                                    <div className="px-1 border-b pb-2">
+                                        <h3 className="text-lg font-bold flex items-center gap-3">
+                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{code}</span>
+                                            <StatusBadge status={skillStatus} />
+                                        </h3>
+                                        {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
+                                    </div>
+                                    <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
+                                        {data.items.map((o: any) => (
+                                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
-                                    {data.items.map((o: any) => (
-                                        <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 );
             })()}
