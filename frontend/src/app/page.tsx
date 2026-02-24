@@ -9,10 +9,10 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 const stats = [
-  { name: "Total de Alunos", value: "150", icon: Users, color: "bg-blue-500", trend: "+4% este mês", href: "/alunos" },
-  { name: "Turmas Ativas", value: "6", icon: GraduationCap, color: "bg-purple-500", trend: "Em dia", href: "/relatorios" },
-  { name: "Avaliações", value: "1.2k", icon: ClipboardCheck, color: "bg-emerald-500", trend: "Nesta semana", href: "/avaliacao" },
-  { name: "IA Insights", value: "48", icon: Sparkles, color: "bg-amber-500", trend: "Novas rubricas", href: "/ia" },
+  { name: "Total de Alunos", value: "--", icon: Users, color: "bg-blue-500", trend: "Consulte a listagem", href: "/alunos" },
+  { name: "Turmas Ativas", value: "--", icon: GraduationCap, color: "bg-purple-500", trend: "Em processamento", href: "/relatorios" },
+  { name: "Avaliações", value: "--", icon: ClipboardCheck, color: "bg-emerald-500", trend: "Aguardando registros", href: "/avaliacao" },
+  { name: "IA Insights", value: "--", icon: Sparkles, color: "bg-amber-500", trend: "Em breve", href: "/ia" },
 ];
 
 const quickActions = [
@@ -140,22 +140,9 @@ export default function Home() {
 
             {/* Mini Heatmap Preview */}
             <div className="overflow-x-auto">
-              <div className="flex gap-1 min-w-max">
-                {["EF06MA01", "EF06MA03", "EF06MA14", "EF06LP01", "EF06CI01"].map((skill) => (
-                  <div key={skill} className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] font-mono text-muted-foreground writing-mode-vertical mb-1">{skill}</span>
-                    {[4, 2, 3, 1, 4, 3, 2, 4, 1, 3].map((level, i) => (
-                      <div
-                        key={i}
-                        className={cn("h-6 w-6 rounded text-[10px] font-bold flex items-center justify-center text-white",
-                          level === 4 ? "bg-emerald-500" : level === 3 ? "bg-blue-500" : level === 2 ? "bg-amber-400" : "bg-red-500"
-                        )}
-                      >
-                        {level}
-                      </div>
-                    ))}
-                  </div>
-                ))}
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <BarChart3 className="mb-2 h-8 w-8 opacity-20" />
+                <p className="text-sm">Os dados de proficiência aparecerão aqui após as primeiras avaliações.</p>
               </div>
             </div>
           </motion.div>
@@ -172,21 +159,9 @@ export default function Home() {
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             Alunos em Alerta
           </h2>
-          {[
-            { name: "João Pedro A.", class_name: "6º Ano A", avg: 1.2 },
-            { name: "Gabriela C.", class_name: "6º Ano A", avg: 1.4 },
-            { name: "Carlos E. S.", class_name: "6º Ano B", avg: 1.8 },
-          ].map((student, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 p-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50 text-xs font-bold text-red-600 dark:text-red-400 shrink-0">
-                {student.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-red-700 dark:text-red-400 truncate">{student.name}</p>
-                <p className="text-xs text-red-500/70">{student.class_name} · Média {student.avg.toFixed(1)}</p>
-              </div>
-            </div>
-          ))}
+          <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+            <p className="text-sm">Nenhum aluno em alerta por enquanto.</p>
+          </div>
           <Link href="/relatorios" className="block text-center text-xs text-primary hover:underline pt-2">
             Ver todos os alertas →
           </Link>

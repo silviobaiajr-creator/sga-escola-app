@@ -119,30 +119,30 @@ def login(payload: dict, db: Session = Depends(get_db)):
     }
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[models.User]:
     if not token:
-        raise HTTPException(status_code=401, detail="Não autenticado.")
+        return None
     payload = verify_token(token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+        return None
 
     user_id = payload.get("sub")
+    if not user_id: return None
     import uuid
     try:
         uid = uuid.UUID(user_id)
     except Exception:
-        raise HTTPException(status_code=401, detail="Token inválido.")
+        return None
 
     user = db.query(models.User).filter(models.User.id == uid).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    
-    if user.is_active is False:
-        raise HTTPException(status_code=403, detail="Usuário inativo.")
+    if not user or user.is_active is False:
+        return None
 
     return user
 
 @router.get("/me")
-def get_me(user: models.User = Depends(get_current_user)):
+def get_me(user: Optional[models.User] = Depends(get_current_user)):
     """Retorna o usuário autenticado a partir do Bearer token."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Não autenticado ou token inválido.")
     return user_to_dict(user)
