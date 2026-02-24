@@ -30,7 +30,7 @@ function StatusBadge({ status }: { status: string }) {
 // ─────────────────────────────────────────
 // RUBRIC LEVELS PANEL
 // ─────────────────────────────────────────
-function RubricsPanel({ objectiveId, teacherId }: { objectiveId: string; teacherId: string }) {
+function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId: string; teacherId: string; objectiveStatus: string }) {
     const [rubrics, setRubrics] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
@@ -62,11 +62,18 @@ function RubricsPanel({ objectiveId, teacherId }: { objectiveId: string; teacher
         return (
             <div className="space-y-3 p-3">
                 <p className="text-xs text-muted-foreground">Nenhuma rubrica cadastrada para este objetivo.</p>
-                <button onClick={handleGenerate} disabled={generating}
-                    className="btn-primary flex items-center gap-2 text-xs py-2 px-3">
-                    {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : "✨"}
-                    {generating ? "Gerando..." : "Gerar rubrica com IA"}
-                </button>
+                {objectiveStatus === "approved" ? (
+                    <button onClick={handleGenerate} disabled={generating}
+                        className="btn-primary flex items-center gap-2 text-xs py-2 px-3">
+                        {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : "✨"}
+                        {generating ? "Gerando..." : "Gerar rubrica com IA"}
+                    </button>
+                ) : (
+                    <div className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-500 border border-amber-500/20 flex gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <p>A geração das rubricas só estará liberada após este Objetivo ser <strong>Aprovado</strong>.</p>
+                    </div>
+                )}
             </div>
         );
     }
@@ -165,7 +172,7 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                         className="overflow-hidden border-t border-border bg-secondary/30">
                         <div className="p-1">
                             <p className="px-3 py-2 text-xs font-medium text-muted-foreground">📊 Rubricas de Avaliação (4 Níveis)</p>
-                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} />
+                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} objectiveStatus={obj.status} />
                         </div>
                     </motion.div>
                 )}

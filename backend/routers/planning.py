@@ -165,20 +165,17 @@ def list_objectives(
 def generate_objectives(body: GenerateObjectivesRequest, db: Session = Depends(get_db)):
     """
     Gera objetivos via IA e salva como 'draft'.
-    Regra #12: Não regera se já houver objetivos aprovados para esta habilidade.
+    Regra: Uma habilidade BNCC só pode gerar objetivos UMA VEZ para a escola toda (por disciplina).
     """
-    existing_approved = db.query(models.LearningObjective).filter_by(
+    existing_objectives = db.query(models.LearningObjective).filter_by(
         bncc_code=body.bncc_code,
-        discipline_id=body.discipline_id,
-        year_level=body.year_level,
-        bimester=body.bimester,
-        status="approved"
+        discipline_id=body.discipline_id
     ).count()
 
-    if existing_approved > 0:
+    if existing_objectives > 0:
         raise HTTPException(
             status_code=409,
-            detail="Objetivos já aprovados para esta habilidade. Edite os objetivos existentes."
+            detail="Os objetivos de aprendizagem para esta habilidade já foram gerados. Eles são comuns para toda a escola."
         )
 
     # Buscar a habilidade BNCC

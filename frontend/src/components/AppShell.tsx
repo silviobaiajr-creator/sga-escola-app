@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, GraduationCap, LogOut, Bell, Search } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/useAuth";
 
 interface AppShellProps {
     children: React.ReactNode;
@@ -14,6 +15,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
+    const { user, logout } = useAuth();
 
     // Don't render the shell on login page
     const isLoginPage = pathname === "/login";
@@ -63,13 +65,15 @@ export function AppShell({ children }: AppShellProps) {
 
                         {/* User Avatar */}
                         <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-1.5">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                                P
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white uppercase">
+                                {user ? (user.full_name || user.username || "?")[0] : "?"}
                             </div>
-                            <span className="hidden text-sm font-medium sm:block">Professor</span>
+                            <span className="hidden text-sm font-medium sm:block capitalize">
+                                {user ? (user.role === "coordinator" ? "Coordenador" : user.role === "admin" ? "Admin" : "Professor") : "Carregando..."}
+                            </span>
                         </div>
 
-                        <button className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-red-500">
+                        <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-red-500" title="Sair do sistema">
                             <LogOut className="h-4 w-4" />
                         </button>
                     </div>

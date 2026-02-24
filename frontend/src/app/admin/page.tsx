@@ -15,6 +15,8 @@ import {
     getTeacherClass, createTeacherClass, deleteTeacherClass,
     uploadStudentsCSV, uploadBnccCSV
 } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
+import { useRouter } from "next/navigation";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -741,8 +743,28 @@ function TeacherClassTab() {
 // PÁGINA PRINCIPAL ADMIN
 // ─────────────────────────────────────────
 export default function AdminPage() {
-    const [activeTab, setActiveTab] = useState<Tab>("turmas");
+    const [activeTab, setActiveTab] = useState("classes");
+    const { user, isLoading: validatingAuth } = useAuth();
+    const router = useRouter();
 
+    useEffect(() => {
+        if (!validatingAuth) {
+            if (!user || (user.role !== "admin" && user.role !== "coordinator")) {
+                router.replace("/");
+            }
+        }
+    }, [user, validatingAuth, router]);
+
+    if (validatingAuth || !user || (user.role !== "admin" && user.role !== "coordinator")) {
+        return (
+            <div className="flex min-h-screen items-center justify-center flex-col gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground text-sm">Validando permissões...</p>
+            </div>
+        );
+    }
+
+    // Tabs definition (with icons)
     return (
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
             {/* Header */}
