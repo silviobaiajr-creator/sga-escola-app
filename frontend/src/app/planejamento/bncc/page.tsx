@@ -21,8 +21,8 @@ export default function BnccLibraryPage() {
 
     const filteredSkills = skills.filter(skill => {
         const matchesSearch =
-            skill.bncc_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            skill.skill_description.toLowerCase().includes(searchQuery.toLowerCase());
+            (skill.bncc_code || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (skill.skill_description || "").toLowerCase().includes(searchQuery.toLowerCase());
 
         const matchesYear = selectedYear ? skill.year_level === Number(selectedYear) : true;
 

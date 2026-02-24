@@ -129,18 +129,22 @@ def _count_teachers_for_discipline(db: Session, discipline_id: int, year_level: 
 
 @router.get("/objectives")
 def list_objectives(
-    bncc_code: str,
     discipline_id: int,
     year_level: int,
     bimester: int,
+    bncc_code: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    rows = db.query(models.LearningObjective).filter_by(
-        bncc_code=bncc_code,
+    q = db.query(models.LearningObjective).filter_by(
         discipline_id=discipline_id,
         year_level=year_level,
         bimester=bimester
-    ).order_by(models.LearningObjective.order_index).all()
+    )
+    
+    if bncc_code and bncc_code != "_all":
+        q = q.filter_by(bncc_code=bncc_code)
+        
+    rows = q.order_by(models.LearningObjective.order_index).all()
 
     result = []
     for r in rows:
