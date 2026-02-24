@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FileCheck2, CheckCircle2, XCircle, Loader2, ChevronDown,
-    ChevronUp, AlertTriangle, BookOpen, Clock, Info
+    ChevronUp, AlertTriangle, BookOpen, Clock, Info, Edit3, Save, X
 } from "lucide-react";
 import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel } from "@/lib/api";
 
@@ -48,8 +48,8 @@ function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId
         finally { setGenerating(false); }
     };
 
-    const handleApprove = async (rubricId: string, action: string) => {
-        try { await approveRubricLevel(rubricId, { teacher_id: teacherId, action }); load(); }
+    const handleApprove = async (rubricId: string, action: string, newDesc?: string) => {
+        try { await approveRubricLevel(rubricId, { teacher_id: teacherId, action, new_description: newDesc }); load(); }
         catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
     };
 
@@ -81,26 +81,76 @@ function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId
     return (
         <div className="space-y-2 p-3">
             {rubrics.map((r: any) => (
-                <div key={r.id} className={`rounded-xl border p-3 ${levelColors[r.level] || ""}`}>
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1 flex-1">
-                            <p className="text-xs font-semibold">{levelLabels[r.level]}</p>
-                            <p className="text-xs leading-relaxed">{r.description}</p>
+                <RubricItem key={r.id} r={r} teacherId={teacherId} levelColors={levelColors} levelLabels={levelLabels} handleApprove={handleApprove} />
+            ))}
+        </div>
+    );
+}
+
+function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: any) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editDesc, setEditDesc] = useState(r.description);
+    const [acting, setActing] = useState(false);
+
+    const onSave = async () => {
+        if (editDesc === r.description) { setIsEditing(false); return; }
+        setActing(true);
+        await handleApprove(r.id, "edited", editDesc);
+        setIsEditing(false);
+        setActing(false);
+    };
+
+    const lastEdit = r.approvals?.filter((a: any) => a.action === "edited").slice(-1)[0];
+    const canAct = r.status === "pending" && !r.approvals?.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+
+    return (
+        <div className={`rounded-xl border p-3 ${levelColors[r.level] || ""}`}>
+            <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1 flex-1">
+                    <p className="text-xs font-semibold">{levelLabels[r.level]}</p>
+
+                    {isEditing ? (
+                        <div className="mt-2 space-y-2">
+                            <textarea className="input text-xs min-h-[80px]" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                            <div className="flex gap-2">
+                                <button onClick={onSave} disabled={acting} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1.5 px-3 rounded-lg flex gap-1 items-center transition-colors">
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Salvar
+                                </button>
+                                <button onClick={() => { setIsEditing(false); setEditDesc(r.description); }} className="bg-secondary hover:bg-secondary/80 text-foreground text-xs py-1.5 px-3 rounded-lg transition-colors">Cancelar</button>
+                            </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                            <StatusBadge status={r.status} />
-                            {r.status === "pending" && (
-                                <div className="flex gap-1 mt-1">
-                                    <button onClick={() => handleApprove(r.id, "approved")}
-                                        className="rounded-lg bg-emerald-500 px-2 py-1 text-xs text-white hover:bg-emerald-600">✓</button>
-                                    <button onClick={() => handleApprove(r.id, "rejected")}
-                                        className="rounded-lg bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600">✗</button>
+                    ) : (
+                        <>
+                            {lastEdit && (
+                                <div className="mb-2 rounded-lg bg-background/50 p-2 border border-border">
+                                    <p className="text-[10px] text-muted-foreground mb-1 font-semibold uppercase tracking-wider flex items-center gap-1">
+                                        <Info className="w-3 h-3" /> Edição Recente: Versão Anterior
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-through opacity-70">{lastEdit.previous_description}</p>
                                 </div>
                             )}
-                        </div>
-                    </div>
+                            <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
+                        </>
+                    )}
                 </div>
-            ))}
+                <div className="flex flex-col items-end gap-2">
+                    <StatusBadge status={r.status} />
+                    {!isEditing && (
+                        <div className="flex gap-1.5 mt-1">
+                            {canAct && (
+                                <button onClick={() => { setActing(true); handleApprove(r.id, "approved").finally(() => setActing(false)); }} disabled={acting}
+                                    className="rounded-lg bg-emerald-500 p-1.5 text-white hover:bg-emerald-600 transition-colors shadow-sm" title="Aprovar">
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                </button>
+                            )}
+                            <button onClick={() => setIsEditing(true)}
+                                className="rounded-lg bg-secondary p-1.5 text-foreground hover:bg-secondary/80 transition-colors border border-border shadow-sm" title="Editar">
+                                <Edit3 className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
@@ -111,56 +161,101 @@ function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId
 function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: string; onRefresh: () => void }) {
     const [expanded, setExpanded] = useState(false);
     const [acting, setActing] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editDesc, setEditDesc] = useState(obj.description);
 
-    const handleAction = async (action: string) => {
+    const handleAction = async (action: string, newDesc?: string) => {
         setActing(true);
-        try { await approveObjective(obj.id, { teacher_id: teacherId, action }); onRefresh(); }
+        try {
+            const res = await approveObjective(obj.id, { teacher_id: teacherId, action, new_description: newDesc, notes: newDesc ? "Edição efetuada" : undefined });
+
+            // Regra: Se a ação de aprovar atingiu o consenso necessário e virou 'approved', gera rubricas
+            if (res.data?.status === "approved" && obj.status !== "approved" && !obj.has_rubrics) {
+                generateRubrics(obj.id, { teacher_id: teacherId }).catch(() => { });
+            }
+
+            onRefresh();
+        }
         catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
         finally { setActing(false); }
     };
 
-    const canAct = obj.status === "pending";
+    const onSave = async () => {
+        if (editDesc === obj.description) { setIsEditing(false); return; }
+        await handleAction("edited", editDesc);
+        setIsEditing(false);
+    };
+
+    const lastEdit = obj.approvals?.filter((a: any) => a.action === "edited").slice(-1)[0];
+    const canAct = obj.status === "pending" && !obj.approvals?.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
 
     return (
         <div className="rounded-2xl border border-border bg-card/60 overflow-hidden">
             <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-mono text-muted-foreground">Obj. {obj.order_index}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">Obj. {obj.order_index}</span>
                             <StatusBadge status={obj.status} />
                         </div>
-                        <p className="text-sm leading-relaxed">{obj.description}</p>
+                        {isEditing ? (
+                            <div className="space-y-3 mt-3">
+                                <textarea className="input text-sm min-h-[100px]" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                                <div className="flex gap-2">
+                                    <button onClick={onSave} disabled={acting} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1.5 px-4 rounded-lg flex gap-1 items-center transition-colors">
+                                        {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar Edição
+                                    </button>
+                                    <button onClick={() => { setIsEditing(false); setEditDesc(obj.description); }} className="bg-secondary hover:bg-secondary/80 text-foreground text-xs py-1.5 px-4 rounded-lg transition-colors border border-border">Cancelar</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {lastEdit && (
+                                    <div className="mb-3 rounded-xl bg-secondary/50 p-3 border border-border">
+                                        <p className="text-[10px] text-muted-foreground mb-1.5 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <Info className="w-3.5 h-3.5" /> Edição Recente: Versão Anterior
+                                        </p>
+                                        <p className="text-sm text-muted-foreground line-through opacity-70">{lastEdit.previous_description}</p>
+                                    </div>
+                                )}
+                                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
+                            </>
+                        )}
                     </div>
-                    <button onClick={() => setExpanded(v => !v)}
-                        className="flex-shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary transition-colors">
-                        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                        <button onClick={() => setExpanded(v => !v)}
+                            className="flex-shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary transition-colors border border-transparent hover:border-border">
+                            {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Actions */}
-                {canAct && (
-                    <div className="mt-3 flex gap-2">
-                        <button onClick={() => handleAction("approved")} disabled={acting}
-                            className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50">
-                            {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                            Aprovar
-                        </button>
-                        <button onClick={() => handleAction("rejected")} disabled={acting}
-                            className="flex items-center gap-1.5 rounded-xl bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50">
-                            <XCircle className="h-3 w-3" /> Rejeitar
-                        </button>
-                    </div>
-                )}
-
-                {/* Approvals history */}
-                {obj.approvals?.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                        {obj.approvals.map((a: any, i: number) => (
-                            <span key={i} className={`text-xs rounded-full px-2 py-0.5 border ${a.action === "approved" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
-                                {a.action === "approved" ? "✓" : "✗"} Prof. {a.teacher_id?.slice(-4)}
-                            </span>
-                        ))}
+                {!isEditing && (
+                    <div className="mt-4 flex items-center justify-between">
+                        <div className="flex gap-2">
+                            {canAct && (
+                                <button onClick={() => handleAction("approved")} disabled={acting}
+                                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50 shadow-sm transition-colors">
+                                    {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                    Aprovar
+                                </button>
+                            )}
+                            <button onClick={() => setIsEditing(true)}
+                                className="flex items-center gap-1.5 rounded-xl bg-secondary border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors shadow-sm">
+                                <Edit3 className="h-3.5 w-3.5" /> Editar
+                            </button>
+                        </div>
+                        {/* Approvals history */}
+                        {obj.approvals?.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 justify-end max-w-[50%]">
+                                {obj.approvals.filter((a: any) => a.action === "approved").map((a: any, i: number) => (
+                                    <span key={i} className="text-[10px] rounded-full px-2 py-0.5 border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-medium">
+                                        ✓ Prof. {a.teacher_id?.slice(-4)}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -193,6 +288,7 @@ export default function ObjetivosPage() {
     const [objectives, setObjectives] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [viewMode, setViewMode] = useState<"all" | "approved">("all");
 
     const teacherId = typeof window !== "undefined"
         ? JSON.parse(localStorage.getItem("sga_user") || "{}").id || ""
@@ -268,44 +364,90 @@ export default function ObjetivosPage() {
                     onChange={e => setSearchQuery(e.target.value)} />
             </div>
 
-            {/* Stats */}
+            {/* Stats e Toggle */}
             {objectives.length > 0 && (
-                <div className="grid grid-cols-4 gap-3">
-                    {[
-                        { label: "Total", value: stats.total, color: "text-foreground" },
-                        { label: "Aprovados", value: stats.approved, color: "text-emerald-400" },
-                        { label: "Pendentes", value: stats.pending, color: "text-amber-400" },
-                        { label: "Rascunhos", value: stats.draft, color: "text-muted-foreground" },
-                    ].map(s => (
-                        <div key={s.label} className="rounded-xl border border-border bg-card/60 p-3 text-center">
-                            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                        </div>
-                    ))}
+                <div className="space-y-4">
+                    <div className="grid grid-cols-4 gap-3">
+                        {[
+                            { label: "Total", value: stats.total, color: "text-foreground" },
+                            { label: "Aprovados", value: stats.approved, color: "text-emerald-400" },
+                            { label: "Pendentes", value: stats.pending, color: "text-amber-400" },
+                            { label: "Rascunhos", value: stats.draft, color: "text-muted-foreground" },
+                        ].map(s => (
+                            <div key={s.label} className="rounded-xl border border-border bg-card/60 p-3 text-center">
+                                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                                <p className="text-xs text-muted-foreground">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-center p-1 bg-secondary/50 rounded-xl max-w-sm mx-auto border border-border">
+                        <button onClick={() => setViewMode("all")} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewMode === "all" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>Todos os Status</button>
+                        <button onClick={() => setViewMode("approved")} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewMode === "approved" ? "bg-background shadow-sm text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}>Apenas Aprovados</button>
+                    </div>
                 </div>
             )}
 
             {/* List */}
-            {!selectedDisc ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-                    <BookOpen className="mb-3 h-10 w-10 opacity-30" />
-                    <p className="text-sm">Selecione uma disciplina para ver os objetivos</p>
-                </div>
-            ) : loading ? (
-                <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-            ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-                    <AlertTriangle className="mb-3 h-10 w-10 opacity-30" />
-                    <p className="text-sm">Nenhum objetivo encontrado para este filtro.</p>
-                    <p className="text-xs mt-1">Use o Consultor Pedagógico para gerar objetivos.</p>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {filtered.map(o => (
-                        <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
-                    ))}
-                </div>
-            )}
+            {(() => {
+                const displayList = viewMode === "approved" ? filtered.filter(o => o.status === "approved") : filtered;
+
+                if (!selectedDisc) return (
+                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                        <BookOpen className="mb-3 h-10 w-10 opacity-30" />
+                        <p className="text-sm">Selecione uma disciplina para ver os objetivos</p>
+                    </div>
+                );
+
+                if (loading) return (
+                    <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                );
+
+                if (displayList.length === 0) return (
+                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                        <AlertTriangle className="mb-3 h-10 w-10 opacity-30" />
+                        <p className="text-sm">Nenhum objetivo encontrado para este filtro.</p>
+                        <p className="text-xs mt-1">Acione o filtro ou use o Consultor Pedagógico.</p>
+                    </div>
+                );
+
+                if (viewMode === "approved") {
+                    const grouped = displayList.reduce((acc, curr) => {
+                        const code = curr.bncc_code || "Sem BNCC vinculada";
+                        if (!acc[code]) acc[code] = { description: curr.bncc_description || "", items: [] };
+                        acc[code].items.push(curr);
+                        return acc;
+                    }, {} as Record<string, { description: string, items: any[] }>);
+
+                    return (
+                        <div className="space-y-8">
+                            {Object.entries(grouped).map(([code, data]) => (
+                                <div key={code} className="space-y-4">
+                                    <div className="px-1 border-b pb-2 cursor-pointer group">
+                                        <h3 className="text-lg font-bold flex items-center gap-3">
+                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20 group-hover:bg-emerald-500/25 transition-colors">{code}</span>
+                                        </h3>
+                                        {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
+                                    </div>
+                                    <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
+                                        {data.items.map(o => (
+                                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="space-y-3">
+                        {displayList.map(o => (
+                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                        ))}
+                    </div>
+                );
+            })()}
         </div>
     );
 }

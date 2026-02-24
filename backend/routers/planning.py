@@ -149,8 +149,13 @@ def list_objectives(
     result = []
     for r in rows:
         approvals = [
-            {"teacher_id": str(a.teacher_id), "action": a.action,
-             "notes": a.notes, "created_at": str(a.created_at)}
+            {
+                "teacher_id": str(a.teacher_id), 
+                "action": a.action,
+                "notes": a.notes, 
+                "created_at": str(a.created_at),
+                "previous_description": a.previous_description
+            }
             for a in r.approvals
         ]
         has_rubrics = len(r.rubric_levels) > 0
@@ -158,6 +163,8 @@ def list_objectives(
             "id": str(r.id), "description": r.description,
             "order_index": r.order_index, "status": r.status,
             "ai_explanation": r.ai_explanation,
+            "bncc_code": r.bncc_code,
+            "bncc_description": r.bncc_skill.skill_description if r.bncc_skill else "",
             "has_rubrics": has_rubrics,
             "rubrics_status": r.rubric_levels[0].status if has_rubrics else None,
             "approvals": approvals,
@@ -318,17 +325,24 @@ def approve_objective(
     db.add(history)
 
     if body.action == "approved":
-        # Verificar se todos os professores necessários aprovaram
-        approved_teachers = set(
-            str(a.teacher_id) for a in obj.approvals if a.action == "approved"
-        ) | {body.teacher_id}
+        # Identificar a última edição para invalidar aprovações antigas
+        edits = [a for a in obj.approvals if a.action == "edited" and a.created_at is not None]
+        last_edit_time = max([e.created_at for e in edits]) if edits else None
 
-        if teacher_count <= 1 or len(approved_teachers) >= teacher_count:
+        valid_approvals = set()
+        for a in obj.approvals:
+            if a.action == "approved" and a.created_at is not None:
+                if not last_edit_time or a.created_at >= last_edit_time:
+                    valid_approvals.add(str(a.teacher_id))
+                    
+        valid_approvals.add(str(body.teacher_id))
+
+        if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
             obj.status = "approved"
             message = "Aprovado!"
         else:
             obj.status = "pending"
-            message = f"Aprovação registrada. Aguardando {teacher_count - len(approved_teachers)} professor(es)."
+            message = f"Aprovação registrada. Aguardando {teacher_count - len(valid_approvals)} professor(es)."
     else:
         obj.status = "rejected"
         message = "Objetivo rejeitado."
@@ -345,9 +359,27 @@ def submit_for_approval(objective_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Objetivo não encontrado.")
     if obj.status != "draft":
         raise HTTPException(status_code=400, detail="Apenas objetivos em rascunho podem ser submetidos.")
-    obj.status = "pending"
+    
+    # Regra #1: Auto-Aprovação do Criador ao "Salvar"
+    if obj.created_by:
+        history = models.ObjectiveApproval(
+            objective_id=obj.id,
+            teacher_id=obj.created_by,
+            action="approved",
+            notes="Auto-aprovado na submissão (Criador)"
+        )
+        db.add(history)
+        
+        teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
+        if teacher_count <= 1:
+            obj.status = "approved"
+        else:
+            obj.status = "pending"
+    else:
+        obj.status = "pending"
+        
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "status": obj.status}
 
 
 # ─────────────────────────────────────────
@@ -365,8 +397,13 @@ def get_rubrics(objective_id: str, db: Session = Depends(get_db)):
             "id": str(r.id), "level": r.level, "description": r.description,
             "status": r.status,
             "approvals": [
-                {"teacher_id": str(a.teacher_id), "action": a.action,
-                 "notes": a.notes, "created_at": str(a.created_at)}
+                {
+                    "teacher_id": str(a.teacher_id), 
+                    "action": a.action,
+                    "notes": a.notes, 
+                    "created_at": str(a.created_at),
+                    "previous_description": a.previous_description
+                }
                 for a in r.approvals
             ]
         }
@@ -415,16 +452,33 @@ def generate_rubrics(
         desc = rubric.get(str(level_num), "")
         if not desc:
             continue
-        # Regra #14: 1 professor → aprovação automática
-        initial_status = "approved" if teacher_count <= 1 else "pending"
+            
+        teacher_uuid = _uuid.UUID(teacher_id) if teacher_id else None
+        
         rl = models.RubricLevel(
             objective_id=obj.id,
             level=level_num,
             description=desc,
-            status=initial_status,
-            created_by=_uuid.UUID(teacher_id) if teacher_id else None
+            status="pending",
+            created_by=teacher_uuid
         )
         db.add(rl)
+        db.flush()
+        
+        # Auto-aprovar para o criador
+        if teacher_uuid:
+            history = models.RubricApproval(
+                rubric_level_id=rl.id, teacher_id=teacher_uuid,
+                action="approved", notes="Auto-aprovado na geração (Criador)"
+            )
+            db.add(history)
+            
+            if teacher_count <= 1:
+                rl.status = "approved"
+            else:
+                rl.status = "pending"
+        else:
+            rl.status = "approved" if teacher_count <= 1 else "pending"
 
     db.commit()
     return {"ok": True, "levels": rubric}
@@ -463,11 +517,19 @@ def update_rubric_level(
     teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
 
     if body.action == "approved":
-        approved_teachers = set(
-            str(a.teacher_id) for a in rl.approvals if a.action == "approved"
-        ) | {body.teacher_id}
+        # Identificar a última edição para invalidar antigas
+        edits = [a for a in rl.approvals if a.action == "edited" and a.created_at is not None]
+        last_edit_time = max([e.created_at for e in edits]) if edits else None
 
-        if teacher_count <= 1 or len(approved_teachers) >= teacher_count:
+        valid_approvals = set()
+        for a in rl.approvals:
+            if a.action == "approved" and a.created_at is not None:
+                if not last_edit_time or a.created_at >= last_edit_time:
+                    valid_approvals.add(str(a.teacher_id))
+                    
+        valid_approvals.add(str(body.teacher_id))
+
+        if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
             rl.status = "approved"
         else:
             rl.status = "pending"

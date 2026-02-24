@@ -187,8 +187,15 @@ export default function ConsultorPage() {
     const handleSave = async () => {
         if (draftIds.length === 0) return;
         setSaving(true);
+        const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("sga_user") || "{}") : {};
         try {
-            await Promise.all(draftIds.map(id => submitObjective(id)));
+            const results = await Promise.all(draftIds.map(id => submitObjective(id)));
+            // Regra: se o objetivo constar como "approved" automaticamente, disparamos a geração de rubricas em background (fire-and-forget)
+            results.forEach((res, index) => {
+                if (res.data?.status === "approved") {
+                    generateRubrics(draftIds[index], { teacher_id: user.id || "00000000-0000-0000-0000-000000000000" }).catch(() => { });
+                }
+            });
             setSaved(true);
         } catch (e: any) {
             alert(e?.response?.data?.detail || "Erro ao salvar.");
