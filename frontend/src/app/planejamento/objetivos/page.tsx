@@ -7,6 +7,24 @@ import {
     ChevronUp, AlertTriangle, BookOpen, Clock, Info, Edit3, Save, X
 } from "lucide-react";
 import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel } from "@/lib/api";
+import { diffWords } from "diff";
+
+// ─────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────
+function DiffText({ oldText, newText }: { oldText: string, newText: string }) {
+    if (!oldText) return <p className="text-xs text-muted-foreground line-through opacity-70">{oldText}</p>;
+    const diff = diffWords(oldText, newText);
+    return (
+        <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap mt-2">
+            {diff.map((part, index) => {
+                if (part.added) return <span key={index} className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold px-1 py-0.5 rounded">{part.value}</span>;
+                if (part.removed) return <span key={index} className="bg-red-500/20 text-red-600 dark:text-red-400 line-through opacity-70 px-1 py-0.5 rounded mr-1">{part.value}</span>;
+                return <span key={index}>{part.value}</span>;
+            })}
+        </p>
+    );
+}
 
 // ─────────────────────────────────────────
 // STATUS BADGE
@@ -30,21 +48,28 @@ function StatusBadge({ status }: { status: string }) {
 // ─────────────────────────────────────────
 // RUBRIC LEVELS PANEL
 // ─────────────────────────────────────────
-function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId: string; teacherId: string; objectiveStatus: string }) {
+function RubricsPanel({ objectiveId, teacherId, objectiveStatus, setObjectiveRubricStatus }: { objectiveId: string; teacherId: string; objectiveStatus: string; setObjectiveRubricStatus: (status: string) => void }) {
     const [rubrics, setRubrics] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
 
     const load = () => {
         setLoading(true);
-        getRubrics(objectiveId).then(r => setRubrics(r.data)).catch(() => { }).finally(() => setLoading(false));
+        getRubrics(objectiveId).then(r => {
+            setRubrics(r.data);
+            const statuses = r.data.map((ru: any) => ru.status);
+            if (statuses.includes("pending")) setObjectiveRubricStatus("pending");
+            else if (statuses.includes("rejected")) setObjectiveRubricStatus("rejected");
+            else if (statuses.length > 0) setObjectiveRubricStatus("approved");
+            else setObjectiveRubricStatus("none");
+        }).catch(() => { }).finally(() => setLoading(false));
     };
     useEffect(() => { load(); }, [objectiveId]);
 
     const handleGenerate = async () => {
         setGenerating(true);
         try { await generateRubrics(objectiveId, { teacher_id: teacherId }); load(); }
-        catch (e: any) { alert(e?.response?.data?.detail || "Erro ao gerar rubrica."); }
+        catch (e: any) { alert(e?.response?.data?.detail || "Erro ao gerar rubricas."); }
         finally { setGenerating(false); }
     };
 
@@ -66,7 +91,7 @@ function RubricsPanel({ objectiveId, teacherId, objectiveStatus }: { objectiveId
                     <button onClick={handleGenerate} disabled={generating}
                         className="btn-primary flex items-center gap-2 text-xs py-2 px-3">
                         {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : "✨"}
-                        {generating ? "Gerando..." : "Gerar rubrica com IA"}
+                        {generating ? "Gerando..." : "Gerar rubricas com IA"}
                     </button>
                 ) : (
                     <div className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-500 border border-amber-500/20 flex gap-2">
@@ -123,10 +148,10 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
                         <>
                             {lastEdit && (
                                 <div className="mb-2 rounded-lg bg-background/50 p-2 border border-border">
-                                    <p className="text-[10px] text-muted-foreground mb-1 font-semibold uppercase tracking-wider flex items-center gap-1">
-                                        <Info className="w-3 h-3" /> Edição Recente: Versão Anterior
+                                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1">
+                                        <Info className="w-3 h-3" /> Modificações Requeridas (por {lastEdit.teacher_name}):
                                     </p>
-                                    <p className="text-xs text-muted-foreground line-through opacity-70">{lastEdit.previous_description}</p>
+                                    <DiffText oldText={lastEdit.previous_description} newText={r.description} />
                                 </div>
                             )}
                             <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
@@ -163,17 +188,15 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
     const [acting, setActing] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editDesc, setEditDesc] = useState(obj.description);
+    const [rubricStatus, setRubricStatus] = useState<string>("none");
 
     const handleAction = async (action: string, newDesc?: string) => {
         setActing(true);
         try {
             const res = await approveObjective(obj.id, { teacher_id: teacherId, action, new_description: newDesc, notes: newDesc ? "Edição efetuada" : undefined });
-
-            // Regra: Se a ação de aprovar atingiu o consenso necessário e virou 'approved', gera rubricas
             if (res.data?.status === "approved" && obj.status !== "approved" && !obj.has_rubrics) {
                 generateRubrics(obj.id, { teacher_id: teacherId }).catch(() => { });
             }
-
             onRefresh();
         }
         catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
@@ -189,14 +212,22 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
     const lastEdit = obj.approvals?.filter((a: any) => a.action === "edited").slice(-1)[0];
     const canAct = obj.status === "pending" && !obj.approvals?.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
 
+    // Lógica para status composto
+    let compoundMsg = "";
+    if (obj.status === "approved") {
+        if (rubricStatus === "pending") compoundMsg = "Objetivo Aprovado, aguardando Rubricas.";
+        else if (rubricStatus === "approved") compoundMsg = "Objetivo e Rubricas Aprovados. ✅";
+    }
+
     return (
-        <div className="rounded-2xl border border-border bg-card/60 overflow-hidden">
+        <div className={`rounded-2xl border transition-all overflow-hidden ${obj.status === "approved" ? "bg-card border-emerald-500/30" : "bg-card/60 border-border"}`}>
             <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">Obj. {obj.order_index}</span>
                             <StatusBadge status={obj.status} />
+                            {compoundMsg && <span className="text-xs font-medium text-emerald-500">{compoundMsg}</span>}
                         </div>
                         {isEditing ? (
                             <div className="space-y-3 mt-3">
@@ -212,10 +243,10 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                             <>
                                 {lastEdit && (
                                     <div className="mb-3 rounded-xl bg-secondary/50 p-3 border border-border">
-                                        <p className="text-[10px] text-muted-foreground mb-1.5 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                            <Info className="w-3.5 h-3.5" /> Edição Recente: Versão Anterior
+                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <Info className="w-3.5 h-3.5" /> Modificações (por {lastEdit.teacher_name}):
                                         </p>
-                                        <p className="text-sm text-muted-foreground line-through opacity-70">{lastEdit.previous_description}</p>
+                                        <DiffText oldText={lastEdit.previous_description} newText={obj.description} />
                                     </div>
                                 )}
                                 <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
@@ -250,8 +281,8 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                         {obj.approvals?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 justify-end max-w-[50%]">
                                 {obj.approvals.filter((a: any) => a.action === "approved").map((a: any, i: number) => (
-                                    <span key={i} className="text-[10px] rounded-full px-2 py-0.5 border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-medium">
-                                        ✓ Prof. {a.teacher_id?.slice(-4)}
+                                    <span key={i} className="text-[10px] rounded-md px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">
+                                        ✓ {a.teacher_name}
                                     </span>
                                 ))}
                             </div>
@@ -267,7 +298,7 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                         className="overflow-hidden border-t border-border bg-secondary/30">
                         <div className="p-1">
                             <p className="px-3 py-2 text-xs font-medium text-muted-foreground">📊 Rubricas de Avaliação (4 Níveis)</p>
-                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} objectiveStatus={obj.status} />
+                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} objectiveStatus={obj.status} setObjectiveRubricStatus={setRubricStatus} />
                         </div>
                     </motion.div>
                 )}
@@ -283,12 +314,14 @@ export default function ObjetivosPage() {
     const [disciplines, setDisciplines] = useState<any[]>([]);
     const [availableYears, setAvailableYears] = useState<number[]>([]);
     const [selectedDisc, setSelectedDisc] = useState<string>("");
-    const [yearLevel, setYearLevel] = useState<number>(0); // 0 indica "não carregado ainda"
+    const [yearLevel, setYearLevel] = useState<number>(0);
     const [bimester, setBimester] = useState<number>(1);
     const [objectives, setObjectives] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [viewMode, setViewMode] = useState<"all" | "approved">("all");
+
+    // Novo Estado de viewMode suportará "all", "approved", "pending", "draft"
+    const [viewMode, setViewMode] = useState<"all" | "approved" | "pending" | "draft">("all");
 
     const teacherId = typeof window !== "undefined"
         ? JSON.parse(localStorage.getItem("sga_user") || "{}").id || ""
@@ -309,9 +342,8 @@ export default function ObjetivosPage() {
         if (!selectedDisc) return;
         setLoading(true);
         try {
-            // Buscar todos os objetivos para a disciplina/ano/bimestre selecionados
             const r = await getObjectives({
-                bncc_code: "_all",   // backend ignora se não for específico
+                bncc_code: "_all",
                 discipline_id: selectedDisc,
                 year_level: yearLevel,
                 bimester,
@@ -322,13 +354,17 @@ export default function ObjetivosPage() {
 
     useEffect(() => { if (selectedDisc) load(); }, [selectedDisc, yearLevel, bimester]);
 
-    const filtered = objectives.filter(o => !searchQuery || o.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filtered = objectives.filter(o => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return o.description.toLowerCase().includes(q) || (o.bncc_code && o.bncc_code.toLowerCase().includes(q));
+    });
 
     const stats = {
-        total: objectives.length,
-        approved: objectives.filter(o => o.status === "approved").length,
-        pending: objectives.filter(o => o.status === "pending").length,
-        draft: objectives.filter(o => o.status === "draft").length,
+        total: filtered.length,
+        approved: filtered.filter(o => o.status === "approved").length,
+        pending: filtered.filter(o => o.status === "pending").length,
+        draft: filtered.filter(o => o.status === "draft").length,
     };
 
     return (
@@ -360,37 +396,31 @@ export default function ObjetivosPage() {
                 <select className="input" value={bimester} onChange={e => setBimester(Number(e.target.value))}>
                     {[1, 2, 3, 4].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
                 </select>
-                <input className="input" placeholder="Buscar objetivo..." value={searchQuery}
+                <input className="input" placeholder="Buscar habilidade ou objetivo..." value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)} />
             </div>
 
-            {/* Stats e Toggle */}
+            {/* Cards Interativos */}
             {objectives.length > 0 && (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-4 gap-3">
-                        {[
-                            { label: "Total", value: stats.total, color: "text-foreground" },
-                            { label: "Aprovados", value: stats.approved, color: "text-emerald-400" },
-                            { label: "Pendentes", value: stats.pending, color: "text-amber-400" },
-                            { label: "Rascunhos", value: stats.draft, color: "text-muted-foreground" },
-                        ].map(s => (
-                            <div key={s.label} className="rounded-xl border border-border bg-card/60 p-3 text-center">
-                                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                                <p className="text-xs text-muted-foreground">{s.label}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="flex justify-center p-1 bg-secondary/50 rounded-xl max-w-sm mx-auto border border-border">
-                        <button onClick={() => setViewMode("all")} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewMode === "all" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>Todos os Status</button>
-                        <button onClick={() => setViewMode("approved")} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewMode === "approved" ? "bg-background shadow-sm text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}>Apenas Aprovados</button>
-                    </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[
+                        { id: "all", label: "Total", value: stats.total, color: "text-foreground", activeBg: "bg-secondary border-primary/30" },
+                        { id: "approved", label: "Aprovados", value: stats.approved, color: "text-emerald-500", activeBg: "bg-emerald-500/10 border-emerald-500/30" },
+                        { id: "pending", label: "Pendentes", value: stats.pending, color: "text-amber-500", activeBg: "bg-amber-500/10 border-amber-500/30" },
+                        { id: "draft", label: "Rascunhos", value: stats.draft, color: "text-neutral-500", activeBg: "bg-neutral-500/10 border-neutral-500/30" },
+                    ].map(s => (
+                        <button key={s.id} onClick={() => setViewMode(s.id as any)}
+                            className={`rounded-xl border transition-all text-center p-3 hover:-translate-y-1 ${viewMode === s.id ? s.activeBg + ' shadow-md scale-[1.02]' : 'border-border bg-card/60 hover:bg-secondary/50'}`}>
+                            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                            <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
+                        </button>
+                    ))}
                 </div>
             )}
 
             {/* List */}
             {(() => {
-                const displayList = viewMode === "approved" ? filtered.filter(o => o.status === "approved") : filtered;
+                const displayList = viewMode === "all" ? filtered : filtered.filter(o => o.status === viewMode);
 
                 if (!selectedDisc) return (
                     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
@@ -404,46 +434,37 @@ export default function ObjetivosPage() {
                 );
 
                 if (displayList.length === 0) return (
-                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground bg-card/60 rounded-2xl border border-border">
                         <AlertTriangle className="mb-3 h-10 w-10 opacity-30" />
-                        <p className="text-sm">Nenhum objetivo encontrado para este filtro.</p>
+                        <p className="text-sm">Nenhum objetivo encontrado para esta visualização.</p>
                         <p className="text-xs mt-1">Acione o filtro ou use o Consultor Pedagógico.</p>
                     </div>
                 );
 
-                if (viewMode === "approved") {
-                    const grouped = displayList.reduce((acc, curr) => {
-                        const code = curr.bncc_code || "Sem BNCC vinculada";
-                        if (!acc[code]) acc[code] = { description: curr.bncc_description || "", items: [] };
-                        acc[code].items.push(curr);
-                        return acc;
-                    }, {} as Record<string, { description: string, items: any[] }>);
-
-                    return (
-                        <div className="space-y-8">
-                            {Object.entries(grouped).map(([code, data]: [string, any]) => (
-                                <div key={code} className="space-y-4">
-                                    <div className="px-1 border-b pb-2 cursor-pointer group">
-                                        <h3 className="text-lg font-bold flex items-center gap-3">
-                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20 group-hover:bg-emerald-500/25 transition-colors">{code}</span>
-                                        </h3>
-                                        {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
-                                    </div>
-                                    <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
-                                        {data.items.map((o: any) => (
-                                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    );
-                }
+                // Agrupar SEMPRE por código BNCC para manter layout organizado
+                const grouped = displayList.reduce((acc, curr) => {
+                    const code = curr.bncc_code || "Sem BNCC vinculada";
+                    if (!acc[code]) acc[code] = { description: curr.bncc_description || "", items: [] };
+                    acc[code].items.push(curr);
+                    return acc;
+                }, {} as Record<string, { description: string, items: any[] }>);
 
                 return (
-                    <div className="space-y-3">
-                        {displayList.map((o: any) => (
-                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                    <div className="space-y-8">
+                        {Object.entries(grouped).map(([code, data]: [string, any]) => (
+                            <div key={code} className="space-y-4">
+                                <div className="px-1 border-b pb-2">
+                                    <h3 className="text-lg font-bold flex items-center gap-3">
+                                        <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{code}</span>
+                                    </h3>
+                                    {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
+                                </div>
+                                <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
+                                    {data.items.map((o: any) => (
+                                        <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                                    ))}
+                                </div>
+                            </div>
                         ))}
                     </div>
                 );

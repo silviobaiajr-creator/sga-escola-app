@@ -147,18 +147,41 @@ def get_student_evolution(
     for a in assessments:
         code = a.bncc_code
         if code not in by_skill:
-            by_skill[code] = {"levels": [], "bimester": a.bimester}
-        by_skill[code]["levels"].append(a.level_assigned)
+            by_skill[code] = {"levels": [], "bimester": a.bimester, "objectives": {}}
+            
+        if a.level_assigned:
+            by_skill[code]["levels"].append(a.level_assigned)
+            
+            obj_id = str(a.objective_id) if a.objective_id else "general"
+            if obj_id not in by_skill[code]["objectives"]:
+                by_skill[code]["objectives"][obj_id] = {"levels": [], "description": a.objective.description if a.objective else "Avaliação Geral"}
+            by_skill[code]["objectives"][obj_id]["levels"].append(a.level_assigned)
 
     skill_evolution = []
     for code, data in by_skill.items():
+        skill = db.query(models.BnccLibrary).get(code)
+        
         levels = [l for l in data["levels"] if l is not None]
         avg = round(sum(levels) / len(levels), 2) if levels else 0
+        
+        obj_list = []
+        for obj_id, obj_data in data["objectives"].items():
+            obj_levels = obj_data["levels"]
+            obj_avg = round(sum(obj_levels) / len(obj_levels), 2) if obj_levels else 0
+            obj_list.append({
+                "objective_id": obj_id,
+                "description": obj_data["description"],
+                "average_level": obj_avg,
+                "assessments": len(obj_levels)
+            })
+            
         skill_evolution.append({
             "bncc_code": code,
+            "skill_description": skill.skill_description if skill else "Habilidade não encontrada",
             "average_level": avg,
             "assessments": len(levels),
-            "bimester": data["bimester"]
+            "bimester": data["bimester"],
+            "objectives": obj_list
         })
     skill_evolution.sort(key=lambda x: x["bimester"] or 0)
 

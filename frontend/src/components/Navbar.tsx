@@ -1,17 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { Menu, X, GraduationCap, LogOut, LayoutDashboard } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/useAuth";
-
-const navItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-];
+import { GraduationCap, LogOut } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export function Navbar() {
-    const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
 
     return (
@@ -19,70 +13,45 @@ export function Navbar() {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                     {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
+                    <Link href="/" className="flex items-center gap-2 transition-transform hover:scale-105">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet-600 shadow-lg shadow-primary/20">
                             <GraduationCap className="h-5 w-5 text-white" />
                         </div>
-                        <span className="text-xl font-bold tracking-tight">SGA-H</span>
-                    </div>
+                        <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-violet-400 bg-clip-text text-transparent">SGA-H</span>
+                    </Link>
 
-                    {/* Desktop: usuário + logout */}
-                    <div className="hidden md:flex items-center gap-3">
-                        {user && (
-                            <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-3 py-1.5">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                    {/* Right side: User Info + Logout */}
+                    {user && (
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            {/* User Badge */}
+                            <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/50 p-1 pr-3 sm:py-1.5 backdrop-blur-sm">
+                                <div className="flex h-7 w-7 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs sm:text-[10px] font-bold text-primary">
                                     {(user.full_name || user.username || "?")[0].toUpperCase()}
                                 </div>
-                                <span className="text-sm font-medium">{user.full_name || user.username}</span>
-                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary capitalize">
-                                    {user.role === "coordinator" ? "Coordenador" : user.role === "admin" ? "Admin" : "Professor"}
-                                </span>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                                    <span className="text-xs sm:text-sm font-medium line-clamp-1 max-w-[100px] sm:max-w-[200px] leading-none">
+                                        {user.full_name || user.username}
+                                    </span>
+                                    <span className="hidden sm:inline-block rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary capitalize">
+                                        {user.role === "coordinator" ? "Coordenador" : user.role === "admin" ? "Admin" : "Professor"}
+                                    </span>
+                                </div>
                             </div>
-                        )}
-                        <button
-                            onClick={logout}
-                            className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-sm font-medium text-red-400 transition-all hover:bg-red-500/10 hover:scale-105 active:scale-95"
-                        >
-                            <LogOut className="h-4 w-4" />
-                            Sair
-                        </button>
-                    </div>
 
-                    {/* Mobile: hamburger */}
-                    <div className="md:hidden">
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-primary focus:outline-none"
-                        >
-                            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Mobile Menu */}
-            <div className={cn(
-                "md:hidden bg-background/95 backdrop-blur-md overflow-hidden transition-all duration-300",
-                isOpen ? "max-h-64 border-b border-border" : "max-h-0"
-            )}>
-                <div className="space-y-1 px-2 pb-3 pt-2">
-                    {user && (
-                        <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-3 py-2 mb-2">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
-                                {(user.full_name || user.username || "?")[0].toUpperCase()}
-                            </div>
-                            <span className="text-sm font-medium">{user.full_name || user.username}</span>
+                            {/* Logout Button */}
+                            <button
+                                onClick={logout}
+                                className="flex items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-2 sm:px-3 sm:py-1.5 text-sm font-medium text-red-500 transition-all hover:bg-red-500/10 hover:scale-105 active:scale-95 shadow-sm"
+                                title="Sair do sistema"
+                            >
+                                <LogOut className="h-4 w-4 shrink-0 sm:h-4 sm:w-4" />
+                                <span className="hidden sm:inline">Sair</span>
+                            </button>
                         </div>
                     )}
-                    <button
-                        onClick={() => { logout(); setIsOpen(false); }}
-                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-base font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-                    >
-                        <LogOut className="h-5 w-5" />
-                        Sair
-                    </button>
                 </div>
             </div>
         </nav>
     );
 }
+

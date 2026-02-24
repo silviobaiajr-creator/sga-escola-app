@@ -151,6 +151,7 @@ def list_objectives(
         approvals = [
             {
                 "teacher_id": str(a.teacher_id), 
+                "teacher_name": a.teacher.full_name or a.teacher.username if a.teacher else "Desconhecido",
                 "action": a.action,
                 "notes": a.notes, 
                 "created_at": str(a.created_at),
@@ -399,6 +400,7 @@ def get_rubrics(objective_id: str, db: Session = Depends(get_db)):
             "approvals": [
                 {
                     "teacher_id": str(a.teacher_id), 
+                    "teacher_name": a.teacher.full_name or a.teacher.username if a.teacher else "Desconhecido",
                     "action": a.action,
                     "notes": a.notes, 
                     "created_at": str(a.created_at),
