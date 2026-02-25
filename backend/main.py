@@ -176,15 +176,17 @@ def save_assessments_batch(items: List[schemas.AssessmentBatchItem], db: Session
         ).first()
 
         if existing:
-            existing.level_assigned = item.level_assigned
+            existing.level_assigned = int(item.level_assigned)
             existing.date = item.date
             existing.teacher_id = item.teacher_id
+            existing.class_name = item.class_name
         else:
             new_assessment = models.Assessment(
                 student_id=item.student_id,
                 bncc_code=item.bncc_code,
-                level_assigned=item.level_assigned,
+                level_assigned=int(item.level_assigned),
                 bimester=item.bimester,
+                class_name=item.class_name,
                 discipline_id=item.discipline_id,
                 teacher_id=item.teacher_id,
                 date=item.date,

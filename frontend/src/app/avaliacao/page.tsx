@@ -96,13 +96,14 @@ export default function AvaliacaoPage() {
 
     // Carregar habilidades APENAS com objetivos aprovados
     useEffect(() => {
-        if (!selectedDisc) return;
+        if (!selectedDisc || !selectedClass) return;
         const cls = classes.find(c => c.class_name === selectedClass);
+        if (!cls) return;
 
         getObjectives({
             bncc_code: "_all",
             discipline_id: selectedDisc,
-            year_level: cls?.year_level || undefined,
+            year_level: cls.year_level,
             bimester: fetchPastBimesters ? undefined : selectedBimester,
         }).then(r => {
             const allObjs = r.data || [];
@@ -130,7 +131,7 @@ export default function AvaliacaoPage() {
         }).catch(() => setSkills([]));
 
         setSelectedSkill(null);
-    }, [selectedDisc, selectedBimester, selectedClass, fetchPastBimesters]);
+    }, [selectedDisc, selectedBimester, selectedClass, fetchPastBimesters, classes]);
 
     // Carregar alunos quando turma muda
     useEffect(() => {

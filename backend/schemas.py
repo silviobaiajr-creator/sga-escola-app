@@ -28,7 +28,7 @@ class HeatmapRequest(BaseModel):
 class AssessmentBatchItem(BaseModel):
     student_id: str
     bncc_code: str
-    level_assigned: float
+    level_assigned: int
     bimester: int
     class_name: Optional[str] = None
     discipline_id: Optional[int] = None
