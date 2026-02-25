@@ -442,6 +442,7 @@ def get_rubrics(objective_id: str, db: Session = Depends(get_db)):
     obj = db.query(models.LearningObjective).get(_uuid.UUID(objective_id))
     if not obj:
         raise HTTPException(status_code=404, detail="Objetivo não encontrado.")
+    levels = sorted(obj.rubric_levels, key=lambda r: r.level)
     required_teachers = _get_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
     return [
         {
