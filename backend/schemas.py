@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from uuid import UUID
+from datetime import datetime
 
 class AIObjectivesRequest(BaseModel):
     skill_code: str
@@ -30,6 +32,6 @@ class AssessmentBatchItem(BaseModel):
     bimester: int
     class_name: Optional[str] = None
     discipline_id: Optional[int] = None
-    teacher_id: Optional[str] = None
-    date: str
-    objective_id: str
+    teacher_id: Optional[UUID] = None
+    date: datetime
+    objective_id: UUID
