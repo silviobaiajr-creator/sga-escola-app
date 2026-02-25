@@ -12,16 +12,20 @@ import { getDashboardData } from "@/lib/api";
 
 const quickActions = [
   { name: "Nova Avaliação", href: "/avaliacao", icon: ClipboardCheck, color: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50" },
-  { name: "Gerar com IA", href: "/ia", icon: Sparkles, color: "bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-400 dark:hover:bg-violet-950/50" },
   { name: "Ver Relatórios", href: "/relatorios", icon: BarChart3, color: "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-400 dark:hover:bg-blue-950/50" },
   { name: "Lista de Alunos", href: "/alunos", icon: Users, color: "bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 dark:hover:bg-orange-950/50" },
 ];
 
 export default function Home() {
   const [dashboard, setDashboard] = useState<any>(null);
+  const [userRole, setUserRole] = useState("teacher");
 
   useEffect(() => {
     getDashboardData().then(r => setDashboard(r.data)).catch(() => { });
+    if (typeof window !== "undefined") {
+      const user = JSON.parse(localStorage.getItem("sga_user") || "{}");
+      setUserRole(user.role || "teacher");
+    }
   }, []);
 
   const summary = dashboard?.summary || { total_students: "--", total_assessments: "--", approved_objectives: "--", pending_approvals: "--" };
@@ -54,7 +58,7 @@ export default function Home() {
             Bem-vindo ao <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">SGA-H Escola</span>
           </h1>
           <p className="mt-4 text-base text-neutral-400 sm:text-lg">
-            Plataforma inovadora de gestão por habilidades (BNCC). Monitore, gere rubricas automatizadas e acompanhe a evolução dos alunos de forma ágil e precisa.
+            Plataforma inovadora de gestão por habilidades (BNCC). Monitore, avalie rubricas e acompanhe a evolução dos alunos de forma ágil e precisa.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
             <Link
@@ -64,13 +68,16 @@ export default function Home() {
               <ClipboardCheck className="h-4 w-4" />
               Realizar Avaliação
             </Link>
-            <Link
-              href="/relatorios"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-semibold backdrop-blur-sm transition-all hover:bg-white/10"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Painel Completo do Coordenador
-            </Link>
+
+            {(userRole === "coordinator" || userRole === "admin") && (
+              <Link
+                href="/relatorios"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-semibold backdrop-blur-sm transition-all hover:bg-white/10"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Painel Completo do Coordenador
+              </Link>
+            )}
           </div>
         </div>
         {/* Decorative */}

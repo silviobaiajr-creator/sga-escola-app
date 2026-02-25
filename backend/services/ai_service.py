@@ -89,7 +89,7 @@ def generate_objectives(
     if specific_competencies:
         comp_list = "\n".join([f"  {c}" for c in specific_competencies])
         comp_section = f"""
-3. COMPETÊNCIAS ESPECÍFICAS DA DISCIPLINA (contexto obrigatório):
+3. COMPETÊNCIAS ESPECÍFICAS DA DISCIPLINA (ALVO PRINCIPAL):
 {comp_list}
 """
 
@@ -97,7 +97,7 @@ def generate_objectives(
     year_info     = f"Ano Escolar: {year_level}º ano" if year_level else ""
 
     prompt = f"""
-Você é um **Consultor Pedagógico Sênior**.
+Você é um **Consultor Pedagógico Sênior**. O objetivo final até o final do ano é que o aluno desenvolva todas as Competências Específicas.
 
 1. CONTEXTO DA HABILIDADE:
    BNCC: {skill_code} - {skill_description}
@@ -105,15 +105,14 @@ Você é um **Consultor Pedagógico Sênior**.
    {year_info}
    {bimester_info}
 {comp_section}
-2. SUA TAREFA: Gere EXATAMENTE {quantity} Objetivos de Aprendizagem em ORDEM PROGRESSIVA.
-   - REGRA DE OURO 1: GERE EXATAMENTE {quantity} OBJETIVOS. NEM A MAIS, NEM A MENOS.
-   - REGRA DE OURO 2: Gere os objetivos em ORDEM PROGRESSIVA rigorosa, onde o primeiro é pré-requisito/base para o segundo e assim por diante.
-   - REGRA DE OURO 3: Se houver competências adicionais fornecidas, você DEVE conectar os objetivos a elas, demonstrando o raciocínio.
-   - REGRA 4: Comece com verbos da Taxonomia de Bloom (identificar, analisar...).
-   - REGRA 5: MÁXIMO 18 palavras por objetivo (seja prático e direto ao ponto).
+
+2. SUA TAREFA: Gere EXATAMENTE {quantity} Objetivos de Aprendizagem.
+   - REGRA 1: Os objetivos DEVEM ter como alvo as competências específicas acima. Mesmo se você for gerar apenas 1 objetivo, ele deve contemplar toda a habilidade visando o alcance das competências.
+   - REGRA 2: Se for mais de 1 objetivo, gere em ORDEM PROGRESSIVA rigorosa, onde o 1º é pré-requisito para o 2º.
+   - REGRA 3: Comece com verbos da Taxonomia de Bloom (identificar, analisar...). Máximo 18 palavras por objetivo.
 
 3. FORMATO DE SAÍDA OBRIGATÓRIO (PARA ECONOMIZAR TOKENS):
-EXPLICACAO: [Resuma a integração com as competências e motivo da progressão de forma EXTREMAMENTE CURTA. Máximo de 2 ou 3 frases. Seja objetivo.]
+EXPLICACAO: [Crie uma Fundamentação Pedagógica OBRIGATÓRIA explicando brevemente o porquê da escolha do(s) objetivo(s) e qual a relação direta deles com as Competências Específicas fornecidas. Seja claro e direto (2 a 3 frases).]
 ###
 OBJ1: [texto 1]|[justificativa super curta 1]
 OBJ2: [texto 2]|[justificativa super curta 2]
@@ -130,11 +129,11 @@ OBJ{quantity}: [texto {quantity}]|[justificativa super curta {quantity}]
 
         if "###" in text:
             parts   = text.split("###", 1)
-            explanation = parts[0].replace("EXPLICACAO:", "").replace("EXPLICAÇÃO:", "").strip()
+            explanation = parts[0].replace("EXPLICACAO:", "").replace("EXPLICAÇÃO:", "").replace("EXPLICACAO", "").strip()
             obj_block   = parts[1].strip()
         else:
             obj_block   = text
-            explanation = "A IA gerou os objetivos diretamente."
+            explanation = "A IA gerou os objetivos diretamente, fundamentados na habilidade."
 
         # Parsear cada linha OBJx
         for line in obj_block.split("\n"):

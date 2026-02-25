@@ -308,15 +308,41 @@ def approve_objective(
     teacher_count  = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
 
     if body.action == "edited" and body.new_description:
+        # 1. Registrar a edição
         history = models.ObjectiveApproval(
             objective_id=obj.id, teacher_id=teacher_uuid, action="edited",
             previous_description=obj.description, notes=body.notes
         )
         db.add(history)
+        
+        # 2. Registrar aprovação automática do editor
+        history_approve = models.ObjectiveApproval(
+            objective_id=obj.id, teacher_id=teacher_uuid, action="approved",
+            notes="Aprovação automática ao salvar edição"
+        )
+        db.add(history_approve)
+
         obj.description = body.new_description
-        obj.status = "pending"
+        
+        # 3. Recalcular aprovações para ver se já bate c/ teacher_count
+        edits = [a for a in obj.approvals if a.action == "edited" and a.created_at is not None]
+        last_edit_time = max([e.created_at for e in edits]) if edits else None
+
+        valid_approvals = {str(teacher_uuid)}  # já conta o próprio autor
+        for a in obj.approvals:
+            if a.action == "approved" and a.created_at is not None:
+                if not last_edit_time or a.created_at >= last_edit_time:
+                    valid_approvals.add(str(a.teacher_id))
+
+        if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
+            obj.status = "approved"
+            msg = "Editado e Aprovado."
+        else:
+            obj.status = "pending"
+            msg = f"Editado. Faltam {teacher_count - len(valid_approvals)} aprovações."
+
         db.commit()
-        return {"ok": True, "status": "pending", "message": "Editado. Aguarda re-aprovação."}
+        return {"ok": True, "status": obj.status, "message": msg}
 
     # Registrar aprovação/rejeição
     history = models.ObjectiveApproval(
@@ -504,10 +530,34 @@ def update_rubric_level(
             action="edited", previous_description=rl.description, notes=body.notes
         )
         db.add(history)
+        
+        history_approve = models.RubricApproval(
+            rubric_level_id=rl.id, teacher_id=teacher_uuid,
+            action="approved", notes="Aprovação automática ao salvar edição"
+        )
+        db.add(history_approve)
+        
         rl.description = body.new_description
-        rl.status = "pending"
+        
+        obj = rl.objective
+        teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
+        
+        edits = [a for a in rl.approvals if a.action == "edited" and a.created_at is not None]
+        last_edit_time = max([e.created_at for e in edits]) if edits else None
+        
+        valid_approvals = {str(teacher_uuid)}
+        for a in rl.approvals:
+            if a.action == "approved" and a.created_at is not None:
+                if not last_edit_time or a.created_at >= last_edit_time:
+                    valid_approvals.add(str(a.teacher_id))
+                    
+        if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
+            rl.status = "approved"
+        else:
+            rl.status = "pending"
+            
         db.commit()
-        return {"ok": True, "status": "pending"}
+        return {"ok": True, "status": rl.status}
 
     history = models.RubricApproval(
         rubric_level_id=rl.id, teacher_id=teacher_uuid,

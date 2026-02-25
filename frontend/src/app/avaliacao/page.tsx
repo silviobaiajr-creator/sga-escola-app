@@ -245,26 +245,41 @@ export default function AvaliacaoPage() {
         getDisciplines().then(r => setDisciplines(r.data)).catch(() => { });
     }, []);
 
-    // Carregar habilidades quando filtro muda
+    // Carregar habilidades APENAS com objetivos aprovados
     useEffect(() => {
         if (!selectedDisc) return;
-        const disc = disciplines.find(d => String(d.id) === selectedDisc);
         const cls = classes.find(c => c.class_name === selectedClass);
-        if (!disc) return;
-        getBnccSkills({
-            discipline_id: disc.id,
-            year_grade: cls?.year_level || undefined,
-            // se exibir passados, busca tudo. a filtragem visual ou retorno cuidará disso.
-            limit: 200,
+
+        getObjectives({
+            bncc_code: "_all",
+            discipline_id: selectedDisc,
+            year_level: cls?.year_level || undefined,
+            bimester: fetchPastBimesters ? undefined : selectedBimester,
         }).then(r => {
-            const all = r.data || [];
-            if (fetchPastBimesters) {
-                // Filtra tudo <= bimestre atual
-                setSkills(all.filter((s: any) => s.bimester <= selectedBimester));
-            } else {
-                setSkills(all.filter((s: any) => s.bimester === selectedBimester));
-            }
-        }).catch(() => { });
+            const allObjs = r.data || [];
+            const approved = allObjs.filter((o: any) => o.status === "approved");
+
+            // Fazer a checagem manual de bimestres passados (tratando strings/nums)
+            const finalObjs = fetchPastBimesters
+                ? approved.filter((o: any) => Number(o.bimester) <= selectedBimester)
+                : approved;
+
+            // Extrair habilidades únicas
+            const skillsMap: Record<string, any> = {};
+            finalObjs.forEach((o: any) => {
+                const code = o.bncc_code || "Sem BNCC";
+                if (!skillsMap[code]) {
+                    skillsMap[code] = {
+                        bncc_code: code,
+                        description: o.bncc_description || o.description,
+                        bimester: Number(o.bimester)
+                    };
+                }
+            });
+
+            setSkills(Object.values(skillsMap));
+        }).catch(() => setSkills([]));
+
         setSelectedSkill(null);
     }, [selectedDisc, selectedBimester, selectedClass, fetchPastBimesters]);
 

@@ -141,7 +141,7 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
                             <textarea className="input text-xs min-h-[80px]" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                             <div className="flex gap-2">
                                 <button onClick={onSave} disabled={acting} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1.5 px-3 rounded-lg flex gap-1 items-center transition-colors">
-                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Salvar
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Enviar para Aprovação
                                 </button>
                                 <button onClick={() => { setIsEditing(false); setEditDesc(r.description); }} className="bg-secondary hover:bg-secondary/80 text-foreground text-xs py-1.5 px-3 rounded-lg transition-colors">Cancelar</button>
                             </div>
@@ -238,7 +238,7 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                                 <textarea className="input text-sm min-h-[100px]" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                                 <div className="flex gap-2">
                                     <button onClick={onSave} disabled={acting} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1.5 px-4 rounded-lg flex gap-1 items-center transition-colors">
-                                        {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar Edição
+                                        {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Enviar para Aprovação
                                     </button>
                                     <button onClick={() => { setIsEditing(false); setEditDesc(obj.description); }} className="bg-secondary hover:bg-secondary/80 text-foreground text-xs py-1.5 px-4 rounded-lg transition-colors border border-border">Cancelar</button>
                                 </div>
@@ -364,11 +364,40 @@ export default function ObjetivosPage() {
         return o.description.toLowerCase().includes(q) || (o.bncc_code && o.bncc_code.toLowerCase().includes(q));
     });
 
+    // 1. Agrupar logicamente por Habilidade (código BNCC) para ditar o "Status da Habilidade"
+    const groupedSkills = filtered.reduce((acc, curr) => {
+        const code = curr.bncc_code || "Sem BNCC vinculada";
+        if (!acc[code]) acc[code] = { description: curr.bncc_description || "", items: [] };
+        acc[code].items.push(curr);
+        return acc;
+    }, {} as Record<string, { description: string, skillStatus: string, items: any[] }>);
+
+    // 2. Calcular o Compound Status da Habilidade
+    const groupsArray = Object.entries(groupedSkills).map(([code, data]: [string, any]) => {
+        let allStatuses: string[] = [];
+        data.items.forEach((o: any) => {
+            allStatuses.push(o.status);
+            if (o.has_rubrics && o.rubrics_status) {
+                allStatuses.push(o.rubrics_status);
+            } else if (o.status === "approved" && !o.has_rubrics) {
+                // Objetivo aprovado sem rubricas cadastradas = Planejamento Pendente
+                allStatuses.push("pending");
+            }
+        });
+
+        let skillStatus = "draft";
+        if (allStatuses.includes("rejected")) skillStatus = "rejected";
+        else if (allStatuses.includes("pending")) skillStatus = "pending";
+        else if (allStatuses.every(s => s === "approved")) skillStatus = "approved";
+
+        return { code, description: data.description, skillStatus, items: data.items };
+    });
+
     const stats = {
-        total: filtered.length,
-        approved: filtered.filter(o => o.status === "approved").length,
-        pending: filtered.filter(o => o.status === "pending").length,
-        draft: filtered.filter(o => o.status === "draft").length,
+        total: groupsArray.length,
+        approved: groupsArray.filter(g => g.skillStatus === "approved").length,
+        pending: groupsArray.filter(g => g.skillStatus === "pending").length,
+        draft: groupsArray.filter(g => g.skillStatus === "draft").length,
     };
 
     return (
@@ -405,11 +434,11 @@ export default function ObjetivosPage() {
             </div>
 
             {/* Cards Interativos */}
-            {objectives.length > 0 && (
+            {groupsArray.length > 0 && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {[
                         { id: "all", label: "Total", value: stats.total, color: "text-foreground", activeBg: "bg-secondary border-primary/30" },
-                        { id: "approved", label: "Aprovados", value: stats.approved, color: "text-emerald-500", activeBg: "bg-emerald-500/10 border-emerald-500/30" },
+                        { id: "approved", label: "Aprovadas", value: stats.approved, color: "text-emerald-500", activeBg: "bg-emerald-500/10 border-emerald-500/30" },
                         { id: "pending", label: "Pendentes", value: stats.pending, color: "text-amber-500", activeBg: "bg-amber-500/10 border-amber-500/30" },
                         { id: "draft", label: "Rascunhos", value: stats.draft, color: "text-neutral-500", activeBg: "bg-neutral-500/10 border-neutral-500/30" },
                     ].map(s => (
@@ -424,7 +453,7 @@ export default function ObjetivosPage() {
 
             {/* List */}
             {(() => {
-                const displayList = viewMode === "all" ? filtered : filtered.filter(o => o.status === viewMode);
+                const displayGroups = viewMode === "all" ? groupsArray : groupsArray.filter(g => g.skillStatus === viewMode);
 
                 if (!selectedDisc) return (
                     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
@@ -437,42 +466,28 @@ export default function ObjetivosPage() {
                     <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                 );
 
-                if (displayList.length === 0) return (
+                if (displayGroups.length === 0) return (
                     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground bg-card/60 rounded-2xl border border-border">
                         <AlertTriangle className="mb-3 h-10 w-10 opacity-30" />
-                        <p className="text-sm">Nenhum objetivo encontrado para esta visualização.</p>
+                        <p className="text-sm">Nenhum grupo de habilidade encontrado para esta visualização.</p>
                         <p className="text-xs mt-1">Acione o filtro ou use o Consultor Pedagógico.</p>
                     </div>
                 );
 
-                // Agrupar SEMPRE por código BNCC para manter layout organizado
-                const grouped = displayList.reduce((acc, curr) => {
-                    const code = curr.bncc_code || "Sem BNCC vinculada";
-                    if (!acc[code]) acc[code] = { description: curr.bncc_description || "", items: [] };
-                    acc[code].items.push(curr);
-                    return acc;
-                }, {} as Record<string, { description: string, items: any[] }>);
-
                 return (
                     <div className="space-y-8">
-                        {Object.entries(grouped).map(([code, data]: [string, any]) => {
-                            const statuses = data.items.map((i: any) => i.status);
-                            let skillStatus = "draft";
-                            if (statuses.includes("rejected")) skillStatus = "rejected";
-                            else if (statuses.includes("pending")) skillStatus = "pending";
-                            else if (statuses.every((s: string) => s === "approved")) skillStatus = "approved";
-
+                        {displayGroups.map((group) => {
                             return (
-                                <div key={code} className="space-y-4">
+                                <div key={group.code} className="space-y-4">
                                     <div className="px-1 border-b pb-2">
                                         <h3 className="text-lg font-bold flex items-center gap-3">
-                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{code}</span>
-                                            <StatusBadge status={skillStatus} />
+                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{group.code}</span>
+                                            <StatusBadge status={group.skillStatus} />
                                         </h3>
-                                        {data.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{data.description}</p>}
+                                        {group.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{group.description}</p>}
                                     </div>
                                     <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
-                                        {data.items.map((o: any) => (
+                                        {group.items.map((o: any) => (
                                             <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
                                         ))}
                                     </div>
