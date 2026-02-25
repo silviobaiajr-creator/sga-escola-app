@@ -147,6 +147,20 @@ export default function ConsultorPage() {
         }).catch(() => { });
     }, []);
 
+    // Auto-avanço Etapa 1 -> 2
+    useEffect(() => {
+        if (step === 1 && selectedDisc && yearLevel > 0) {
+            setStep(2);
+        }
+    }, [selectedDisc, yearLevel, step]);
+
+    // Auto-avanço Etapa 2 -> 3
+    useEffect(() => {
+        if (step === 2 && selectedSkill) {
+            setStep(3);
+        }
+    }, [selectedSkill, step]);
+
     // Carregar habilidades
     useEffect(() => {
         if (!selectedDisc || !yearLevel) return;
@@ -254,10 +268,6 @@ export default function ConsultorPage() {
                                     </select>
                                 </div>
                             </div>
-                            <button onClick={() => setStep(2)} disabled={!selectedDisc}
-                                className="btn-primary mt-4 flex items-center gap-2">
-                                Próximo <ChevronRight className="h-4 w-4" />
-                            </button>
                         </div>
                     </motion.div>
                 )}
@@ -267,7 +277,10 @@ export default function ConsultorPage() {
                     <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
                         className="space-y-4">
                         <div className="rounded-2xl border border-border bg-card/60 p-5">
-                            <p className="text-sm font-medium mb-4">2. Selecione a habilidade BNCC</p>
+                            <div className="flex items-center justify-between mb-4">
+                                <p className="text-sm font-medium">2. Selecione a habilidade BNCC</p>
+                                <button onClick={() => setStep(1)} className="text-xs text-muted-foreground hover:text-foreground">Voltar</button>
+                            </div>
                             {skills.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">Nenhuma habilidade encontrada para {selectedDisc?.name} · {yearLevel}º Ano.</p>
                             ) : (
@@ -283,12 +296,6 @@ export default function ConsultorPage() {
                                     ))}
                                 </div>
                             )}
-                            <div className="mt-4 flex gap-2">
-                                <button onClick={() => setStep(1)} className="btn-secondary">Voltar</button>
-                                <button onClick={() => setStep(3)} disabled={!selectedSkill} className="btn-primary flex items-center gap-2">
-                                    Próximo <ChevronRight className="h-4 w-4" />
-                                </button>
-                            </div>
                         </div>
                     </motion.div>
                 )}

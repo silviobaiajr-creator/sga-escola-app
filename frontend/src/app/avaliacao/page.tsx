@@ -84,7 +84,7 @@ function StudentCard({ student, gradeObj = {}, objectives, onGrade }: StudentCar
         if (objectives.length > 0 && !selectedObj) setSelectedObj(objectives[0]);
     }, [objectives]);
 
-    const initials = student.student_name
+    const initials = (student.student_name || "A")
         .split(" ")
         .map((n: string) => n[0])
         .slice(0, 2)

@@ -112,7 +112,7 @@ Você é um **Consultor Pedagógico Sênior**. O objetivo final até o final do 
    - REGRA 3: Comece com verbos da Taxonomia de Bloom (identificar, analisar...). Máximo 18 palavras por objetivo.
 
 3. FORMATO DE SAÍDA OBRIGATÓRIO (PARA ECONOMIZAR TOKENS):
-EXPLICACAO: [Crie uma Fundamentação Pedagógica OBRIGATÓRIA explicando brevemente o porquê da escolha do(s) objetivo(s) e qual a relação direta deles com as Competências Específicas fornecidas. Seja claro e direto (2 a 3 frases).]
+EXPLICACAO: [Crie uma Fundamentação Pedagógica OBRIGATÓRIA explicando brevemente o porquê da escolha do(s) objetivo(s) e qual a relação direta deles com as Competências Específicas fornecidas. CITE TEXTUALMENTE AS COMPETÊNCIAS ESPECÍFICAS ATENDIDAS NESTA JUSTIFICATIVA (ex: "Esses objetivos atendem às competências X e Y porque..."). Seja claro e direto (2 a 4 frases).]
 ###
 OBJ1: [texto 1]|[justificativa super curta 1]
 OBJ2: [texto 2]|[justificativa super curta 2]

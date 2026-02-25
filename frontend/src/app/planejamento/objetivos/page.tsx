@@ -48,7 +48,7 @@ function StatusBadge({ status }: { status: string }) {
 // ─────────────────────────────────────────
 // RUBRIC LEVELS PANEL
 // ─────────────────────────────────────────
-function RubricsPanel({ objectiveId, teacherId, objectiveStatus, setObjectiveRubricStatus }: { objectiveId: string; teacherId: string; objectiveStatus: string; setObjectiveRubricStatus: (status: string) => void }) {
+function RubricsPanel({ objectiveId, teacherId, userRole, objectiveStatus, setObjectiveRubricStatus }: { objectiveId: string; teacherId: string; userRole: string; objectiveStatus: string; setObjectiveRubricStatus: (status: string) => void }) {
     const [rubrics, setRubrics] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
@@ -106,19 +106,30 @@ function RubricsPanel({ objectiveId, teacherId, objectiveStatus, setObjectiveRub
     return (
         <div className="space-y-2 p-3">
             {rubrics.map((r: any) => (
-                <RubricItem key={r.id} r={r} teacherId={teacherId} levelColors={levelColors} levelLabels={levelLabels} handleApprove={handleApprove} />
+                <RubricItem key={r.id} r={r} teacherId={teacherId} userRole={userRole} levelColors={levelColors} levelLabels={levelLabels} handleApprove={handleApprove} />
             ))}
         </div>
     );
 }
 
-function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: any) {
+function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleApprove }: any) {
     const [isEditing, setIsEditing] = useState(false);
     const [editDesc, setEditDesc] = useState(r.description);
     const [acting, setActing] = useState(false);
 
     const onSave = async () => {
-        if (editDesc === r.description) { setIsEditing(false); return; }
+        if (editDesc === r.description) {
+            // Se for apenas rascunho sem mudar, nós fechamos aprovando para dar agilidade
+            if (r.status === "draft" || r.status === "pending") {
+                setActing(true);
+                await handleApprove(r.id, "approved");
+                setIsEditing(false);
+                setActing(false);
+            } else {
+                setIsEditing(false);
+            }
+            return;
+        }
         setActing(true);
         await handleApprove(r.id, "edited", editDesc);
         setIsEditing(false);
@@ -128,7 +139,10 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
     const lastEditIndex = r.approvals ? r.approvals.map((a: any) => a.action).lastIndexOf("edited") : -1;
     const lastEdit = lastEditIndex !== -1 ? r.approvals[lastEditIndex] : null;
     const recentApprovals = r.approvals ? r.approvals.slice(lastEditIndex !== -1 ? lastEditIndex + 1 : 0) : [];
-    const canAct = r.status === "pending" && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+    // Só pode editar ou aprovar se NÃO estiver approved geral.
+    const canAct = (r.status === "pending" || r.status === "draft") && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+    const canEdit = r.status !== "approved";
+    const canReopen = r.status === "approved" && (userRole === "admin" || userRole === "coordinator");
 
     return (
         <div className={`rounded-xl border p-3 ${levelColors[r.level] || ""}`}>
@@ -170,10 +184,18 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
                                     {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                                 </button>
                             )}
-                            <button onClick={() => setIsEditing(true)}
-                                className="rounded-lg bg-secondary p-1.5 text-foreground hover:bg-secondary/80 transition-colors border border-border shadow-sm" title="Editar">
-                                <Edit3 className="h-3 w-3" />
-                            </button>
+                            {canEdit && (
+                                <button onClick={() => setIsEditing(true)}
+                                    className="rounded-lg bg-secondary p-1.5 text-foreground hover:bg-secondary/80 transition-colors border border-border shadow-sm" title="Editar">
+                                    <Edit3 className="h-3 w-3" />
+                                </button>
+                            )}
+                            {canReopen && (
+                                <button onClick={() => { setActing(true); handleApprove(r.id, "reopen").finally(() => setActing(false)); }} disabled={acting}
+                                    className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-1.5 text-amber-500 hover:bg-amber-500/20 transition-colors shadow-sm" title="Reabrir Edição">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -185,7 +207,7 @@ function RubricItem({ r, teacherId, levelColors, levelLabels, handleApprove }: a
 // ─────────────────────────────────────────
 // OBJECTIVE CARD
 // ─────────────────────────────────────────
-function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: string; onRefresh: () => void }) {
+function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teacherId: string; userRole: string; onRefresh: () => void }) {
     const [expanded, setExpanded] = useState(false);
     const [acting, setActing] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -206,7 +228,13 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
     };
 
     const onSave = async () => {
-        if (editDesc === obj.description) { setIsEditing(false); return; }
+        if (editDesc === obj.description) {
+            if (obj.status === "draft" || obj.status === "pending") {
+                await handleAction("approved");
+            }
+            setIsEditing(false);
+            return;
+        }
         await handleAction("edited", editDesc);
         setIsEditing(false);
     };
@@ -214,7 +242,10 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
     const lastEditIndex = obj.approvals ? obj.approvals.map((a: any) => a.action).lastIndexOf("edited") : -1;
     const lastEdit = lastEditIndex !== -1 ? obj.approvals[lastEditIndex] : null;
     const recentApprovals = obj.approvals ? obj.approvals.slice(lastEditIndex !== -1 ? lastEditIndex + 1 : 0) : [];
-    const canAct = obj.status === "pending" && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+
+    const canAct = (obj.status === "pending" || obj.status === "draft") && !recentApprovals.some((a: any) => a.teacher_id === teacherId && a.action === "approved");
+    const canEdit = obj.status !== "approved";
+    const canReopen = obj.status === "approved" && (userRole === "admin" || userRole === "coordinator");
 
     // Lógica para status composto
     let compoundMsg = "";
@@ -276,10 +307,19 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                                     Aprovar
                                 </button>
                             )}
-                            <button onClick={() => setIsEditing(true)}
-                                className="flex items-center gap-1.5 rounded-xl bg-secondary border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors shadow-sm">
-                                <Edit3 className="h-3.5 w-3.5" /> Editar
-                            </button>
+                            {canEdit && (
+                                <button onClick={() => setIsEditing(true)}
+                                    className="flex items-center gap-1.5 rounded-xl bg-secondary border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors shadow-sm">
+                                    <Edit3 className="h-3.5 w-3.5" /> Editar
+                                </button>
+                            )}
+                            {canReopen && (
+                                <button onClick={() => handleAction("reopen")} disabled={acting}
+                                    className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-500 hover:bg-amber-500/20 disabled:opacity-50 shadow-sm transition-colors">
+                                    {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                                    Reabrir Edição
+                                </button>
+                            )}
                         </div>
                         {/* Approvals history */}
                         {obj.approvals?.length > 0 && (
@@ -302,7 +342,7 @@ function ObjectiveItem({ obj, teacherId, onRefresh }: { obj: any; teacherId: str
                         className="overflow-hidden border-t border-border bg-secondary/30">
                         <div className="p-1">
                             <p className="px-3 py-2 text-xs font-medium text-muted-foreground">📊 Rubricas de Avaliação (4 Níveis)</p>
-                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} objectiveStatus={obj.status} setObjectiveRubricStatus={setRubricStatus} />
+                            <RubricsPanel objectiveId={obj.id} teacherId={teacherId} userRole={userRole} objectiveStatus={obj.status} setObjectiveRubricStatus={setRubricStatus} />
                         </div>
                     </motion.div>
                 )}
@@ -329,6 +369,9 @@ export default function ObjetivosPage() {
 
     const teacherId = typeof window !== "undefined"
         ? JSON.parse(localStorage.getItem("sga_user") || "{}").id || ""
+        : "";
+    const userRole = typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("sga_user") || "{}").role || ""
         : "";
 
     useEffect(() => {
@@ -488,7 +531,7 @@ export default function ObjetivosPage() {
                                     </div>
                                     <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
                                         {group.items.map((o: any) => (
-                                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} onRefresh={load} />
+                                            <ObjectiveItem key={o.id} obj={o} teacherId={teacherId} userRole={userRole} onRefresh={load} />
                                         ))}
                                     </div>
                                 </div>

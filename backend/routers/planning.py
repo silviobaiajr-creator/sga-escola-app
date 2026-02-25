@@ -351,9 +351,20 @@ def approve_objective(
     )
     db.add(history)
 
+    if body.action == "reopen":
+        # Administrativo: Voltar o objetivo para Rascunho e abrir para novas edições/aprovações
+        history = models.ObjectiveApproval(
+            objective_id=obj.id, teacher_id=teacher_uuid,
+            action="reopen", notes="Reabertura do processo de edição."
+        )
+        db.add(history)
+        obj.status = "draft"
+        db.commit()
+        return {"ok": True, "status": obj.status, "message": "Reaberto para edição."}
+
     if body.action == "approved":
-        # Identificar a última edição para invalidar aprovações antigas
-        edits = [a for a in obj.approvals if a.action == "edited" and a.created_at is not None]
+        # Identificar a última edição ou reabertura para invalidar aprovações antigas
+        edits = [a for a in obj.approvals if a.action in ("edited", "reopen") and a.created_at is not None]
         last_edit_time = max([e.created_at for e in edits]) if edits else None
 
         valid_approvals = set()
@@ -568,9 +579,19 @@ def update_rubric_level(
     obj = rl.objective
     teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
 
+    if body.action == "reopen":
+        history = models.RubricApproval(
+            rubric_level_id=rl.id, teacher_id=teacher_uuid,
+            action="reopen", notes="Reabertura do processo de edição."
+        )
+        db.add(history)
+        rl.status = "draft"
+        db.commit()
+        return {"ok": True, "status": rl.status, "message": "Reaberto para edição."}
+
     if body.action == "approved":
         # Identificar a última edição para invalidar antigas
-        edits = [a for a in rl.approvals if a.action == "edited" and a.created_at is not None]
+        edits = [a for a in rl.approvals if a.action in ("edited", "reopen") and a.created_at is not None]
         last_edit_time = max([e.created_at for e in edits]) if edits else None
 
         valid_approvals = set()
