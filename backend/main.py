@@ -189,7 +189,20 @@ def save_assessments_batch(items: List[schemas.AssessmentBatchItem], db: Session
             
             # Buscar uma teacher_rubric legada para satisfazer a Constraint FK
             legacy_rubric = db.query(models.TeacherRubric).filter(models.TeacherRubric.bncc_code == item.bncc_code).first()
-            fallback_rubric_id = legacy_rubric.rubric_id if legacy_rubric else f"legacy_{item.bncc_code}"
+            if not legacy_rubric:
+                # Criar uma rubrica v1 dummy on-the-fly para satisfazer a ForeignKey do banco de dados
+                fallback_rubric_id = f"v2_migrated_{item.bncc_code}"
+                new_dummy_rubric = models.TeacherRubric(
+                    rubric_id=fallback_rubric_id,
+                    bncc_code=item.bncc_code,
+                    objective=f"Objetivo v2 - {item.bncc_code}",
+                    discipline_id=item.discipline_id,
+                    status="approved"
+                )
+                db.add(new_dummy_rubric)
+                db.flush() # Força o commit parcial para garantir que o ID exista para o proximo Insert
+            else:
+                fallback_rubric_id = legacy_rubric.rubric_id
 
             new_assessment = models.Assessment(
                 student_id=item.student_id,
