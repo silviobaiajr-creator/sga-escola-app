@@ -8,7 +8,7 @@ import hmac
 import hashlib
 import time
 import pandas as pd
-
+from typing import List
 from .database import engine, Base, get_db
 from . import models, schemas
 from .services import ai_service, analytics_service
