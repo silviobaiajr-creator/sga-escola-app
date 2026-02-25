@@ -160,6 +160,9 @@ def list_objectives(
             for a in r.approvals
         ]
         has_rubrics = len(r.rubric_levels) > 0
+        all_rubrics_approved = has_rubrics and all(rl.status == "approved" for rl in r.rubric_levels)
+        rubrics_status = "approved" if all_rubrics_approved else ("pending" if has_rubrics else None)
+
         result.append({
             "id": str(r.id), "description": r.description,
             "order_index": r.order_index, "status": r.status,
@@ -167,7 +170,7 @@ def list_objectives(
             "bncc_code": r.bncc_code,
             "bncc_description": r.bncc_skill.skill_description if r.bncc_skill else "",
             "has_rubrics": has_rubrics,
-            "rubrics_status": r.rubric_levels[0].status if has_rubrics else None,
+            "rubrics_status": rubrics_status,
             "approvals": approvals,
         })
     return result
@@ -325,14 +328,9 @@ def approve_objective(
         obj.description = body.new_description
         
         # 3. Recalcular aprovações para ver se já bate c/ teacher_count
-        edits = [a for a in obj.approvals if a.action == "edited" and a.created_at is not None]
-        last_edit_time = max([e.created_at for e in edits]) if edits else None
+        # Como é uma nova edição, todas as aprovações anteriores são invalidadas.
+        valid_approvals = {str(teacher_uuid)}  # apenas o próprio autor
 
-        valid_approvals = {str(teacher_uuid)}  # já conta o próprio autor
-        for a in obj.approvals:
-            if a.action == "approved" and a.created_at is not None:
-                if not last_edit_time or a.created_at >= last_edit_time:
-                    valid_approvals.add(str(a.teacher_id))
 
         if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
             obj.status = "approved"
@@ -553,15 +551,10 @@ def update_rubric_level(
         obj = rl.objective
         teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
         
-        edits = [a for a in rl.approvals if a.action == "edited" and a.created_at is not None]
-        last_edit_time = max([e.created_at for e in edits]) if edits else None
-        
+        # Como é uma nova edição, todas as aprovações anteriores são invalidadas.
         valid_approvals = {str(teacher_uuid)}
-        for a in rl.approvals:
-            if a.action == "approved" and a.created_at is not None:
-                if not last_edit_time or a.created_at >= last_edit_time:
-                    valid_approvals.add(str(a.teacher_id))
-                    
+        
+
         if teacher_count <= 1 or len(valid_approvals) >= teacher_count:
             rl.status = "approved"
         else:

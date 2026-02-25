@@ -66,158 +66,6 @@ function RubricExpanded({ objectiveId }: { objectiveId: string }) {
 }
 
 // ─────────────────────────────────────────
-// CARD DE ALUNO
-// ─────────────────────────────────────────
-interface StudentCardProps {
-    student: any;
-    gradeObj: Record<string, number>; // objectiveId -> level
-    objectives: any[];
-    onGrade: (studentId: string, level: number, objectiveId: string) => void;
-}
-
-function StudentCard({ student, gradeObj = {}, objectives, onGrade }: StudentCardProps) {
-    const [expanded, setExpanded] = useState(false);
-    const [selectedObj, setSelectedObj] = useState<any>(objectives[0]);
-    const [showRubric, setShowRubric] = useState(false);
-
-    useEffect(() => {
-        if (objectives.length > 0 && !selectedObj) setSelectedObj(objectives[0]);
-    }, [objectives]);
-
-    const initials = (student.student_name || "A")
-        .split(" ")
-        .map((n: string) => n[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase();
-
-    // The assigned level is for the CURRENTLY selected objective
-    const assigned = gradeObj[selectedObj?.id] || null;
-    const levelInfo = assigned ? LEVELS[assigned - 1] : null;
-
-    // Calcular "Média Parcial" do aluno caso ele tenha mais que um objetivo
-    const assignedValues = Object.values(gradeObj);
-    const avgStudentLvl = assignedValues.length > 0 ? (assignedValues.reduce((a, b) => a + b, 0) / assignedValues.length).toFixed(1) : null;
-
-    const noObjectivesAvailable = objectives.length === 0;
-
-    return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl border-2 transition-all ${avgStudentLvl ? "border-primary/50 bg-card" : "border-border bg-card/60"}`}
-        >
-            {/* Header do card — sempre visível */}
-            <button
-                onClick={() => setExpanded(v => !v)}
-                className="flex w-full items-center gap-3 p-3 text-left focus:outline-none"
-            >
-                {/* Avatar */}
-                <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${avgStudentLvl ? "bg-primary" : "bg-muted-foreground/20"}`}>
-                    {initials}
-                </div>
-                {/* Nome + nível */}
-                <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{student.student_name}</p>
-                    {avgStudentLvl ? (
-                        <p className={`text-xs font-medium text-primary`}>Média: N{avgStudentLvl} ({objectives.length > 0 ? `${assignedValues.length}/${objectives.length} obj` : ""})</p>
-                    ) : (
-                        <p className="text-xs text-muted-foreground">Não avaliado</p>
-                    )}
-                </div>
-                {/* Expand icon */}
-                <div className="flex-shrink-0 text-muted-foreground">
-                    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
-            </button>
-
-            {/* Painel expandido (objetivos + rubrica + botões) */}
-            <AnimatePresence>
-                {expanded && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden border-t border-border bg-secondary/30"
-                    >
-                        {objectives.length > 0 ? (
-                            <div className="p-3 space-y-3">
-                                {/* Seletor de objetivo */}
-                                <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Passo 1: Escolha o Objetivo</p>
-                                    <div className="space-y-1.5 flex flex-col">
-                                        {objectives.map((obj: any) => (
-                                            <button
-                                                key={obj.id}
-                                                onClick={() => setSelectedObj(obj)}
-                                                className={`w-full rounded-xl border px-3 py-2.5 text-left text-xs transition-all flex items-center justify-between gap-2 shadow-sm ${selectedObj?.id === obj.id ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/30"}`}
-                                            >
-                                                <span className="truncate flex-1"><span className="font-bold">Obj {obj.order_index}:</span> {obj.description}</span>
-                                                {gradeObj[obj.id] && <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-2">N{gradeObj[obj.id]}</span>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Rubrica inline - Mobile friendly */}
-                                <div className="rounded-xl border border-border bg-background overflow-hidden shadow-sm">
-                                    <button
-                                        onClick={() => setShowRubric(v => !v)}
-                                        className="flex w-full items-center justify-between bg-secondary/50 p-2.5 text-xs text-foreground font-medium transition-colors"
-                                    >
-                                        <div className="flex items-center gap-1.5">
-                                            <BookOpen className="h-3.5 w-3.5 text-primary" />
-                                            {showRubric ? "Ocultar rubrica (menos detalhes)" : "Ver rubrica completa para avaliar"}
-                                        </div>
-                                        {showRubric ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                    </button>
-                                    <AnimatePresence>
-                                        {showRubric && selectedObj && (
-                                            <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="px-2 pb-1 overflow-hidden">
-                                                <RubricExpanded objectiveId={selectedObj.id} />
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-
-                                {/* Botões rápidos de nível — Associados ao objetivo atual */}
-                                <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 mt-2">Passo 2: Avalie o Objetivo Acima</p>
-                                    <div className="grid grid-cols-4 gap-1.5">
-                                        {LEVELS.map(level => (
-                                            <button
-                                                key={level.value}
-                                                disabled={noObjectivesAvailable}
-                                                onClick={() => onGrade(student.id, level.value, selectedObj?.id)}
-                                                className={`flex flex-col items-center justify-center rounded-xl py-3 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-30 disabled:grayscale
-                                                    ${level.bg}
-                                                    ${assigned === level.value
-                                                        ? `ring-2 ring-white ring-offset-2 ring-offset-card scale-[1.04] shadow-lg`
-                                                        : "opacity-60 hover:opacity-100"
-                                                    }`}
-                                            >
-                                                <span className="text-lg leading-none">{level.value}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-4 text-center">
-                                <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-amber-500/50" />
-                                <p className="text-xs text-amber-600/80">Este aluno não pode ser avaliado ainda.</p>
-                                <p className="text-[10px] text-muted-foreground mt-1">É necessário aprovar os objetivos de aprendizagem dessa habilidade na tela "Biblioteca BNCC/Objetivos" antes de lançar notas.</p>
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
-    );
-}
-
-// ─────────────────────────────────────────
 // PÁGINA PRINCIPAL
 // ─────────────────────────────────────────
 export default function AvaliacaoPage() {
@@ -232,6 +80,7 @@ export default function AvaliacaoPage() {
     const [selectedDisc, setSelectedDisc] = useState("");
     const [selectedBimester, setSelectedBimester] = useState(1);
     const [selectedSkill, setSelectedSkill] = useState<any>(null);
+    const [selectedObj, setSelectedObj] = useState<any>(null);
     const [fetchPastBimesters, setFetchPastBimesters] = useState(false);
 
     // Avaliações: { studentId: { objectiveId: level } }
@@ -257,7 +106,7 @@ export default function AvaliacaoPage() {
             bimester: fetchPastBimesters ? undefined : selectedBimester,
         }).then(r => {
             const allObjs = r.data || [];
-            const approved = allObjs.filter((o: any) => o.status === "approved");
+            const approved = allObjs.filter((o: any) => o.status === "approved" && o.rubrics_status === "approved");
 
             // Fazer a checagem manual de bimestres passados (tratando strings/nums)
             const finalObjs = fetchPastBimesters
@@ -293,15 +142,19 @@ export default function AvaliacaoPage() {
 
     // Carregar objetivos aprovados quando habilidade muda
     useEffect(() => {
-        if (!selectedSkill || !selectedDisc) { setObjectives([]); return; }
+        if (!selectedSkill || !selectedDisc) { setObjectives([]); setSelectedObj(null); return; }
         const cls = classes.find(c => c.class_name === selectedClass);
         getObjectives({
             bncc_code: selectedSkill.bncc_code,
             discipline_id: selectedDisc,
             year_level: cls?.year_level || 6,
             bimester: selectedSkill.bimester || selectedBimester,
-        }).then(r => setObjectives((r.data || []).filter((o: any) => o.status === "approved")))
-            .catch(() => setObjectives([]));
+        }).then(r => {
+            const approvedObjs = (r.data || []).filter((o: any) => o.status === "approved" && o.rubrics_status === "approved");
+            setObjectives(approvedObjs);
+            if (approvedObjs.length > 0) setSelectedObj(approvedObjs[0]);
+            else setSelectedObj(null);
+        }).catch(() => { setObjectives([]); setSelectedObj(null); });
     }, [selectedSkill, selectedDisc, selectedBimester, classes, selectedClass]);
 
     const handleGrade = (studentId: string, level: number, objectiveId: string) => {
@@ -521,16 +374,76 @@ export default function AvaliacaoPage() {
                             <p className="text-xs mt-1 max-w-sm">Esta habilidade não possui objetivos de aprendizagem com status "Aprovado". Edite e aprove o planejamento primeiro!</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-                            {students.map(student => (
-                                <StudentCard
-                                    key={student.id}
-                                    student={student}
-                                    gradeObj={grades[student.id] || {}}
-                                    objectives={objectives}
-                                    onGrade={handleGrade}
-                                />
-                            ))}
+                        <div className="space-y-4">
+                            {/* Selector e Rubricas do Objetivo Atual */}
+                            {selectedSkill && objectives.length > 0 && selectedObj && (
+                                <div className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+                                    <p className="mb-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">1. Selecione o Objetivo a ser avaliado:</p>
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        {objectives.map((obj: any) => {
+                                            const isSelected = selectedObj.id === obj.id;
+                                            return (
+                                                <button
+                                                    key={obj.id}
+                                                    onClick={() => setSelectedObj(obj)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${isSelected ? "bg-primary text-white border-primary shadow-sm" : "bg-secondary text-foreground border-border hover:border-primary/50"}`}
+                                                >
+                                                    Obj {obj.order_index}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                    <p className="text-sm font-medium mb-3">{selectedObj.description}</p>
+
+                                    <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                                        <p className="mb-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">2. Referência de Rubricas:</p>
+                                        <RubricExpanded objectiveId={selectedObj.id} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Alunos List */}
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4 mb-2">3. Lançamento da Turma:</p>
+                            <div className="grid grid-cols-1 gap-2">
+                                {students.map(student => {
+                                    const initials = (student.name || "A").split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
+                                    const assigned = selectedObj ? (grades[student.id]?.[selectedObj.id] || null) : null;
+
+                                    return (
+                                        <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-card p-3 shadow-sm hover:border-primary/30 transition-colors gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white bg-primary">
+                                                    {initials}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-sm font-medium pr-2 text-foreground">{student.name}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-1 items-center sm:justify-end gap-1.5 min-w-[140px]">
+                                                {!selectedObj ? (
+                                                    <span className="text-xs text-muted-foreground">Selecione um objetivo</span>
+                                                ) : (
+                                                    LEVELS.map(level => {
+                                                        const isSelected = assigned === level.value;
+                                                        return (
+                                                            <button
+                                                                key={level.value}
+                                                                onClick={() => handleGrade(student.id, level.value, selectedObj.id)}
+                                                                title={level.full}
+                                                                className={`flex h-10 w-10 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-sm sm:text-xs font-bold transition-all active:scale-95 flex-shrink-0
+                                                            ${level.bg} ${isSelected ? 'ring-2 ring-offset-2 ring-primary shadow-md text-white scale-[1.05]' : 'opacity-40 hover:opacity-100 text-white/90'}`}
+                                                            >
+                                                                {level.value}
+                                                            </button>
+                                                        )
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
                     )}
                 </div>
