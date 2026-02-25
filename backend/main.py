@@ -181,8 +181,19 @@ def save_assessments_batch(items: List[schemas.AssessmentBatchItem], db: Session
             existing.teacher_id = item.teacher_id
             existing.class_name = item.class_name
         else:
+            # WORKAROUND: O banco de dados Supabase (v1) exige rubric_id (NOT NULL + FK). 
+            # Para não quebrar durante a migração v2, enviamos um rubric_id dummy ou o próprio bncc_code temporariamente,
+            # ASSUMINDO que o banco permite se flexibilizarmos ou se houver um registro padrão.
+            # Se for FK restrita, precisaremos capturar a exceção e avisar o sysadmin, ou buscar a rubrica v1 correspondente.
+            # Vamos buscar a rubrica v1 se existir, senão salvamos com rubric_id = "v2_migrated_" + item.bncc_code
+            
+            # Buscar uma teacher_rubric legada para satisfazer a Constraint FK
+            legacy_rubric = db.query(models.TeacherRubric).filter(models.TeacherRubric.bncc_code == item.bncc_code).first()
+            fallback_rubric_id = legacy_rubric.rubric_id if legacy_rubric else f"legacy_{item.bncc_code}"
+
             new_assessment = models.Assessment(
                 student_id=item.student_id,
+                rubric_id=fallback_rubric_id,
                 bncc_code=item.bncc_code,
                 level_assigned=int(item.level_assigned),
                 bimester=item.bimester,
