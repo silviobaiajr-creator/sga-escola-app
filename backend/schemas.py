@@ -22,3 +22,14 @@ class AssessmentRecord(BaseModel):
 
 class HeatmapRequest(BaseModel):
     assessments: List[AssessmentRecord]
+
+class AssessmentBatchItem(BaseModel):
+    student_id: str
+    bncc_code: str
+    level_assigned: float
+    bimester: int
+    class_name: Optional[str] = None
+    discipline_id: Optional[int] = None
+    teacher_id: Optional[str] = None
+    date: str
+    objective_id: str

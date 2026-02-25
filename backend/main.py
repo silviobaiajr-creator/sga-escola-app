@@ -166,6 +166,36 @@ def get_assessments(
     ]
 
 
+@app.post("/api/assessments/batch")
+def save_assessments_batch(items: List[schemas.AssessmentBatchItem], db: Session = Depends(get_db)):
+    for item in items:
+        existing = db.query(models.Assessment).filter_by(
+            student_id=item.student_id,
+            objective_id=item.objective_id,
+            bimester=item.bimester
+        ).first()
+
+        if existing:
+            existing.level_assigned = item.level_assigned
+            existing.date = item.date
+            existing.teacher_id = item.teacher_id
+        else:
+            new_assessment = models.Assessment(
+                student_id=item.student_id,
+                bncc_code=item.bncc_code,
+                level_assigned=item.level_assigned,
+                bimester=item.bimester,
+                discipline_id=item.discipline_id,
+                teacher_id=item.teacher_id,
+                date=item.date,
+                objective_id=item.objective_id
+            )
+            db.add(new_assessment)
+    db.commit()
+    return {"ok": True, "count": len(items)}
+
+
+
 # ─────────────────────────────────────────
 # ROTAS DE IA (legadas — mantidas)
 # ─────────────────────────────────────────

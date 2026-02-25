@@ -176,6 +176,21 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <StatusBadge status={r.status} />
+
+                    {/* Approvals List */}
+                    {r.required_teachers?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[160px] mt-1">
+                            {r.required_teachers.map((rt: any) => {
+                                const hasApproved = recentApprovals.some((a: any) => a.teacher_id === rt.id && a.action === "approved");
+                                return (
+                                    <span key={rt.id} className={`text-[9px] rounded border px-1.5 py-0.5 font-medium ${hasApproved ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-red-500/5 text-red-500/60 dark:text-red-400/60 border-red-500/20"}`}>
+                                        {hasApproved ? "✓" : "⏳"} {rt.name.split(" ")[0]}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     {!isEditing && (
                         <div className="flex gap-1.5 mt-1">
                             {canAct && (
@@ -321,14 +336,17 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                                 </button>
                             )}
                         </div>
-                        {/* Approvals history */}
-                        {obj.approvals?.length > 0 && (
+                        {/* Approvals List */}
+                        {obj.required_teachers?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 justify-end max-w-[50%]">
-                                {obj.approvals.filter((a: any) => a.action === "approved").map((a: any, i: number) => (
-                                    <span key={i} className="text-[10px] rounded-md px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">
-                                        ✓ {a.teacher_name}
-                                    </span>
-                                ))}
+                                {obj.required_teachers.map((rt: any) => {
+                                    const hasApproved = recentApprovals.some((a: any) => a.teacher_id === rt.id && a.action === "approved");
+                                    return (
+                                        <span key={rt.id} className={`text-[10px] rounded-md px-2 py-0.5 font-medium border ${hasApproved ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-red-500/5 text-red-500/60 dark:text-red-400/60 border-red-500/20"}`}>
+                                            {hasApproved ? "✓" : "⏳"} {rt.name}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

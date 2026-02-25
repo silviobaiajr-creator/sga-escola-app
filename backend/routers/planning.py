@@ -114,17 +114,30 @@ def remove_from_planning(planning_id: str, db: Session = Depends(get_db)):
 # OBJETIVOS DE APRENDIZAGEM
 # ─────────────────────────────────────────
 
-def _count_teachers_for_discipline(db: Session, discipline_id: int, year_level: int) -> int:
-    """Conta os professores únicos vinculados à disciplina em turmas do mesmo ano."""
+def _get_teachers_for_discipline(db: Session, discipline_id: int, year_level: int) -> list:
+    """Retorna a lista de professores únicos (id e nome) vinculados à disciplina em turmas do ano."""
     classes = db.query(models.SetupClass).filter_by(year_level=year_level).all()
     class_ids = [c.id for c in classes]
     if not class_ids:
-        return 0
-    count = db.query(models.TeacherClassDiscipline).filter(
+        return []
+
+    tcd_list = db.query(models.TeacherClassDiscipline).filter(
         models.TeacherClassDiscipline.discipline_id == discipline_id,
         models.TeacherClassDiscipline.class_id.in_(class_ids)
-    ).distinct(models.TeacherClassDiscipline.teacher_id).count()
-    return count
+    ).all()
+
+    unique_teachers = {}
+    for tcd in tcd_list:
+        if tcd.teacher_id not in unique_teachers:
+            name = tcd.teacher.full_name or tcd.teacher.username if tcd.teacher else "Desconhecido"
+            unique_teachers[tcd.teacher_id] = {
+                "id": str(tcd.teacher_id),
+                "name": name
+            }
+    return list(unique_teachers.values())
+
+def _count_teachers_for_discipline(db: Session, discipline_id: int, year_level: int) -> int:
+    return len(_get_teachers_for_discipline(db, discipline_id, year_level))
 
 
 @router.get("/objectives")
@@ -162,6 +175,7 @@ def list_objectives(
         has_rubrics = len(r.rubric_levels) > 0
         all_rubrics_approved = has_rubrics and all(rl.status == "approved" for rl in r.rubric_levels)
         rubrics_status = "approved" if all_rubrics_approved else ("pending" if has_rubrics else None)
+        required_teachers = _get_teachers_for_discipline(db, discipline_id, year_level)
 
         result.append({
             "id": str(r.id), "description": r.description,
@@ -172,6 +186,7 @@ def list_objectives(
             "has_rubrics": has_rubrics,
             "rubrics_status": rubrics_status,
             "approvals": approvals,
+            "required_teachers": required_teachers
         })
     return result
 
@@ -427,11 +442,12 @@ def get_rubrics(objective_id: str, db: Session = Depends(get_db)):
     obj = db.query(models.LearningObjective).get(_uuid.UUID(objective_id))
     if not obj:
         raise HTTPException(status_code=404, detail="Objetivo não encontrado.")
-    levels = sorted(obj.rubric_levels, key=lambda r: r.level)
+    required_teachers = _get_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
     return [
         {
             "id": str(r.id), "level": r.level, "description": r.description,
             "status": r.status,
+            "required_teachers": required_teachers,
             "approvals": [
                 {
                     "teacher_id": str(a.teacher_id), 
