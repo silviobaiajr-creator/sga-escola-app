@@ -366,11 +366,6 @@ def approve_objective(
 
     if body.action == "reopen":
         # Administrativo: Voltar o objetivo para Rascunho e abrir para novas edições/aprovações
-        history = models.ObjectiveApproval(
-            objective_id=obj.id, teacher_id=teacher_uuid,
-            action="reopen", notes="Reabertura do processo de edição."
-        )
-        db.add(history)
         obj.status = "draft"
         db.commit()
         return {"ok": True, "status": obj.status, "message": "Reaberto para edição."}
@@ -590,11 +585,6 @@ def update_rubric_level(
     teacher_count = _count_teachers_for_discipline(db, obj.discipline_id, obj.year_level)
 
     if body.action == "reopen":
-        history = models.RubricApproval(
-            rubric_level_id=rl.id, teacher_id=teacher_uuid,
-            action="reopen", notes="Reabertura do processo de edição."
-        )
-        db.add(history)
         rl.status = "draft"
         db.commit()
         return {"ok": True, "status": rl.status, "message": "Reaberto para edição."}

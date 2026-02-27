@@ -147,20 +147,6 @@ export default function ConsultorPage() {
         }).catch(() => { });
     }, []);
 
-    // Auto-avanço Etapa 1 -> 2
-    useEffect(() => {
-        if (step === 1 && selectedDisc && yearLevel > 0) {
-            setStep(2);
-        }
-    }, [selectedDisc, yearLevel, step]);
-
-    // Auto-avanço Etapa 2 -> 3
-    useEffect(() => {
-        if (step === 2 && selectedSkill) {
-            setStep(3);
-        }
-    }, [selectedSkill, step]);
-
     // Carregar habilidades
     useEffect(() => {
         if (!selectedDisc || !yearLevel) return;
@@ -268,6 +254,14 @@ export default function ConsultorPage() {
                                     </select>
                                 </div>
                             </div>
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setStep(2)}
+                                    disabled={!selectedDisc || !yearLevel}
+                                    className="btn-primary flex items-center gap-2 px-6">
+                                    Continuar <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -287,15 +281,28 @@ export default function ConsultorPage() {
                                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                                     {skills.map(s => (
                                         <button key={s.bncc_code} onClick={() => setSelectedSkill(s)}
-                                            className={`w-full rounded-xl border p-3 text-left transition-all ${selectedSkill?.bncc_code === s.bncc_code ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-secondary"}`}>
+                                            className={`w-full rounded-xl border p-3 text-left transition-all ${selectedSkill?.bncc_code === s.bncc_code ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/30 hover:bg-secondary"}`}>
                                             <div className="flex items-start gap-2">
-                                                <span className="mt-0.5 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-mono text-primary">{s.bncc_code}</span>
-                                                <p className="text-xs leading-relaxed">{s.description}</p>
+                                                <div className="flex-1">
+                                                    <span className="mt-0.5 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-mono text-primary inline-block mb-1">{s.bncc_code}</span>
+                                                    <p className="text-xs leading-relaxed text-foreground/90">{s.description}</p>
+                                                </div>
+                                                {selectedSkill?.bncc_code === s.bncc_code && (
+                                                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
+                                                )}
                                             </div>
                                         </button>
                                     ))}
                                 </div>
                             )}
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setStep(3)}
+                                    disabled={!selectedSkill}
+                                    className="btn-primary flex items-center gap-2 px-6">
+                                    Continuar <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 )}

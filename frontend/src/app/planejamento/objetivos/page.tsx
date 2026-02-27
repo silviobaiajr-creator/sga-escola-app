@@ -265,8 +265,15 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
     // Lógica para status composto
     let compoundMsg = "";
     if (obj.status === "approved") {
-        if (rubricStatus === "pending") compoundMsg = "Objetivo Aprovado, aguardando Rubricas.";
-        else if (rubricStatus === "approved") compoundMsg = "Objetivo e Rubricas Aprovados. ✅";
+        const statuses = obj.rubric_levels?.map((rl: any) => rl.status) || [];
+        // Se as rubricas que vieram populadas do backend tiverem "pending" ou se faltam rubricas
+        if (statuses.includes("pending") || (!obj.has_rubrics && statuses.length === 0)) {
+            compoundMsg = "Objetivo Aprovado, aguardando Rubricas.";
+        }
+        // Se há rubricas e todas tão approved
+        else if (obj.has_rubrics && !statuses.includes("pending") && !statuses.includes("rejected")) {
+            compoundMsg = "Objetivo e Rubricas Aprovados. ✅";
+        }
     }
 
     return (
@@ -449,7 +456,8 @@ export default function ObjetivosPage() {
         let skillStatus = "draft";
         if (allStatuses.includes("rejected")) skillStatus = "rejected";
         else if (allStatuses.includes("pending")) skillStatus = "pending";
-        else if (allStatuses.every(s => s === "approved")) skillStatus = "approved";
+        // Só considera "approved" pleno se não tiver pending, draft ou rejected em lugar nenhum.
+        else if (allStatuses.length > 0 && allStatuses.every(s => s === "approved")) skillStatus = "approved";
 
         return { code, description: data.description, skillStatus, items: data.items };
     });
@@ -459,6 +467,68 @@ export default function ObjetivosPage() {
         approved: groupsArray.filter(g => g.skillStatus === "approved").length,
         pending: groupsArray.filter(g => g.skillStatus === "pending").length,
         draft: groupsArray.filter(g => g.skillStatus === "draft").length,
+    };
+
+    // ─────────────────────────────────────────
+    // LÓGICA DE AÇÕES EM LOTE
+    // ─────────────────────────────────────────
+    const [batchActing, setBatchActing] = useState<string | null>(null);
+    const [batchEditModal, setBatchEditModal] = useState<{ isOpen: boolean; groupCode: string; items: any[] }>({ isOpen: false, groupCode: "", items: [] });
+    const [batchEditValues, setBatchEditValues] = useState<Record<string, string>>({});
+
+    const openBatchEdit = (groupCode: string, items: any[]) => {
+        const initialValues: Record<string, string> = {};
+        items.forEach(o => { initialValues[o.id] = o.description; });
+        setBatchEditValues(initialValues);
+        setBatchEditModal({ isOpen: true, groupCode, items });
+    };
+
+    const handleBatchSave = async () => {
+        setBatchActing("saving_batch");
+        try {
+            const promessas = batchEditModal.items.map(o => {
+                const newDesc = batchEditValues[o.id];
+                if (newDesc !== o.description) {
+                    return approveObjective(o.id, { teacher_id: teacherId, action: "edited", new_description: newDesc, notes: "Edição em lote" });
+                }
+                return Promise.resolve();
+            });
+            await Promise.all(promessas);
+            setBatchEditModal({ isOpen: false, groupCode: "", items: [] });
+            load();
+        } catch (e: any) { alert(e?.response?.data?.detail || "Erro ao salvar em lote."); }
+        finally { setBatchActing(null); }
+    };
+
+    const handleBatchApproveObjectives = async (groupCode: string, items: any[]) => {
+        setBatchActing(`obj_${groupCode}`);
+        try {
+            const pendentes = items.filter(o => o.status === "pending" || o.status === "draft");
+            await Promise.all(pendentes.map(o => approveObjective(o.id, { teacher_id: teacherId, action: "approved" })));
+            load();
+        } catch (e: any) { alert(e?.response?.data?.detail || "Erro ao aprovar objetivos em lote."); }
+        finally { setBatchActing(null); }
+    };
+
+    const handleBatchApproveRubrics = async (groupCode: string, items: any[]) => {
+        setBatchActing(`rub_${groupCode}`);
+        try {
+            const approvedObjs = items.filter(o => o.status === "approved" && o.has_rubrics);
+            const promessas: Promise<any>[] = [];
+
+            // Para cada objetivo, precisamos buscar as rubricas atuais e aprovar as pendentes
+            for (const obj of approvedObjs) {
+                const r = await getRubrics(obj.id);
+                const rubricas = r.data || [];
+                const pends = rubricas.filter((ru: any) => ru.status === "pending" || ru.status === "draft");
+                for (const ru of pends) {
+                    promessas.push(approveRubricLevel(ru.id, { teacher_id: teacherId, action: "approved" }));
+                }
+            }
+            if (promessas.length > 0) await Promise.all(promessas);
+            load();
+        } catch (e: any) { alert(e?.response?.data?.detail || "Erro ao aprovar rubricas em lote."); }
+        finally { setBatchActing(null); }
     };
 
     return (
@@ -540,12 +610,39 @@ export default function ObjetivosPage() {
                         {displayGroups.map((group) => {
                             return (
                                 <div key={group.code} className="space-y-4">
-                                    <div className="px-1 border-b pb-2">
-                                        <h3 className="text-lg font-bold flex items-center gap-3">
-                                            <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{group.code}</span>
-                                            <StatusBadge status={group.skillStatus} />
-                                        </h3>
-                                        {group.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{group.description}</p>}
+                                    <div className="px-1 border-b pb-2 flex items-start justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-bold flex items-center gap-3">
+                                                <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{group.code}</span>
+                                                <StatusBadge status={group.skillStatus} />
+                                            </h3>
+                                            {group.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{group.description}</p>}
+                                        </div>
+
+                                        {/* Ações Rápidas (Batch) */}
+                                        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                                            {group.items.some((o: any) => o.status !== "approved") && (
+                                                <button onClick={() => openBatchEdit(group.code, group.items)}
+                                                    className="bg-secondary/80 text-foreground border border-border hover:bg-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                                                    <Edit3 className="h-3.5 w-3.5" />
+                                                    Editar Objetivos
+                                                </button>
+                                            )}
+                                            {group.items.some((o: any) => o.status === "pending" || o.status === "draft") && (
+                                                <button onClick={() => handleBatchApproveObjectives(group.code, group.items)} disabled={!!batchActing}
+                                                    className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                                                    {batchActing === `obj_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                                    Aprovar Todos (Obj)
+                                                </button>
+                                            )}
+                                            {group.items.some((o: any) => o.status === "approved" && o.has_rubrics && o.rubrics_status !== "approved") && (
+                                                <button onClick={() => handleBatchApproveRubrics(group.code, group.items)} disabled={!!batchActing}
+                                                    className="bg-blue-500/10 text-blue-500 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                                                    {batchActing === `rub_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                                    Aprovar Todas (Rubricas)
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
                                         {group.items.map((o: any) => (
@@ -558,6 +655,68 @@ export default function ObjetivosPage() {
                     </div>
                 );
             })()}
+
+            {/* Modal de Edição em Lote */}
+            <AnimatePresence>
+                {batchEditModal.isOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+                        <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+                            className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+                            <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/30">
+                                <div>
+                                    <h2 className="text-lg font-bold flex items-center gap-2">
+                                        <Edit3 className="w-5 h-5 text-primary" /> Editar Objetivos em Lote
+                                    </h2>
+                                    <p className="text-xs text-muted-foreground mt-1">Habilidade: <span className="font-mono text-primary">{batchEditModal.groupCode}</span></p>
+                                </div>
+                                <button onClick={() => setBatchEditModal({ isOpen: false, groupCode: "", items: [] })} className="p-2 hover:bg-secondary rounded-full">
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                            </div>
+                            <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                                {batchEditModal.items.map((o: any) => {
+                                    const lastEditIndex = o.approvals ? o.approvals.map((a: any) => a.action).lastIndexOf("edited") : -1;
+                                    const lastEdit = lastEditIndex !== -1 ? o.approvals[lastEditIndex] : null;
+
+                                    return (
+                                        <div key={o.id} className="bg-secondary/20 p-3 rounded-xl border border-border">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs font-bold text-muted-foreground uppercase">Objetivo {o.order_index}</span>
+                                                <StatusBadge status={o.status} />
+                                            </div>
+                                            {lastEdit && (
+                                                <div className="mb-2 p-2 bg-background/50 rounded-lg border border-border/50">
+                                                    <p className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1 mb-1">
+                                                        <Info className="w-3 h-3" /> Modificações Anteriores ({lastEdit.teacher_name})
+                                                    </p>
+                                                    <DiffText oldText={lastEdit.previous_description} newText={o.description} />
+                                                </div>
+                                            )}
+                                            <textarea
+                                                className="input text-sm min-h-[80px]"
+                                                value={batchEditValues[o.id]}
+                                                onChange={(e) => setBatchEditValues({ ...batchEditValues, [o.id]: e.target.value })}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="p-4 border-t border-border flex justify-end gap-3 bg-secondary/30">
+                                <button onClick={() => setBatchEditModal({ isOpen: false, groupCode: "", items: [] })} disabled={batchActing === "saving_batch"}
+                                    className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-secondary transition-colors">
+                                    Cancelar
+                                </button>
+                                <button onClick={handleBatchSave} disabled={batchActing === "saving_batch"}
+                                    className="btn-primary flex items-center gap-2 px-6 py-2">
+                                    {batchActing === "saving_batch" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    Salvar Alterações
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

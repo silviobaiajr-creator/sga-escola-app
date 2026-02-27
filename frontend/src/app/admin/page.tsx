@@ -13,7 +13,7 @@ import {
     getUsers, createUser, toggleUserActive,
     getCompetencies, createCompetency, deleteCompetency,
     getTeacherClass, createTeacherClass, deleteTeacherClass,
-    uploadStudentsCSV, uploadBnccCSV
+    uploadStudentsCSV, uploadBnccCSV, updateUser
 } from "@/lib/api";
 import { useAuth } from "@/lib/useAuth";
 import { useRouter } from "next/navigation";
@@ -231,6 +231,7 @@ function UsersTab() {
     const [form, setForm] = useState({ username: "", password: "", full_name: "", email: "", role: "teacher" });
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
+    const [editId, setEditId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -239,12 +240,40 @@ function UsersTab() {
     }, []);
     useEffect(() => { load(); }, [load]);
 
-    const handleAdd = async () => {
-        if (!form.username || !form.password) return;
+    const openCreate = () => {
+        setForm({ username: "", password: "", full_name: "", email: "", role: "teacher" });
+        setEditId(null);
+        setShowForm(true);
+    };
+
+    const openEdit = (user: any) => {
+        setForm({
+            username: user.username,
+            password: "", // Senha vazia para não alterar, a menos que digitada
+            full_name: user.full_name || "",
+            email: user.email || "",
+            role: user.role
+        });
+        setEditId(user.id);
+        setShowForm(true);
+    };
+
+    const handleSave = async () => {
+        if (!form.username) return;
+        if (!editId && !form.password) return; // Senha obrigatoria apenas p/ criar
+
         setSaving(true);
         try {
-            await createUser(form);
+            const payload: any = { ...form };
+            if (editId && !form.password) delete payload.password;
+
+            if (editId) {
+                await updateUser(editId, payload);
+            } else {
+                await createUser(payload);
+            }
             setForm({ username: "", password: "", full_name: "", email: "", role: "teacher" });
+            setEditId(null);
             setShowForm(false);
             load();
         } catch (e: any) { alert(e?.response?.data?.detail || "Erro."); }
@@ -261,7 +290,7 @@ function UsersTab() {
 
     return (
         <div className="space-y-4">
-            <button onClick={() => setShowForm(v => !v)}
+            <button onClick={openCreate}
                 className="btn-primary flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Novo usuário
@@ -278,17 +307,23 @@ function UsersTab() {
                         <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
                             placeholder="Usuário (login)" className="input" />
                         <input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                            type="password" placeholder="Senha inicial" className="input" />
+                            type="password" placeholder={editId ? "Nova Senha (opcional)" : "Senha inicial"} className="input" />
                         <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input">
                             <option value="teacher">Professor</option>
                             <option value="coordinator">Coordenador</option>
                             <option value="admin">Administrador</option>
                         </select>
-                        <button onClick={handleAdd} disabled={saving}
-                            className="btn-primary flex items-center justify-center gap-2">
-                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                            Salvar
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={handleSave} disabled={saving}
+                                className="btn-primary flex-1 flex items-center justify-center gap-2">
+                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                Salvar
+                            </button>
+                            <button onClick={() => { setShowForm(false); setEditId(null); }} disabled={saving}
+                                className="px-4 border border-border bg-card/50 rounded-xl hover:bg-card">
+                                Cancelar
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -309,8 +344,13 @@ function UsersTab() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Badge color={roleColor(u.role)}>{roleLabel(u.role)}</Badge>
+                                    <button onClick={() => openEdit(u)}
+                                        className="rounded-full p-1.5 transition-colors text-muted-foreground hover:text-blue-400 bg-secondary/50" title="Editar Usuário">
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
                                     <button onClick={() => handleToggle(u.id)}
-                                        className={`rounded-full p-1 transition-colors ${u.is_active ? "text-emerald-400 hover:text-red-400" : "text-red-400 hover:text-emerald-400"}`}>
+                                        title={u.is_active ? "Desativar" : "Ativar"}
+                                        className={`rounded-full p-1.5 transition-colors bg-secondary/50 ${u.is_active ? "text-emerald-400 hover:text-red-400" : "text-red-400 hover:text-emerald-400"}`}>
                                         {u.is_active ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                                     </button>
                                 </div>

@@ -44,6 +44,7 @@ export const deleteDiscipline = (id: number) => api.delete(`/api/admin/disciplin
 
 export const getUsers = () => api.get("/api/admin/users");
 export const createUser = (data: object) => api.post("/api/admin/users", data);
+export const updateUser = (id: string, data: object) => api.put(`/api/admin/users/${id}`, data);
 export const toggleUserActive = (id: string) => api.put(`/api/admin/users/${id}/toggle-active`);
 
 export const getCompetencies = (params?: object) => api.get("/api/admin/competencies", { params });

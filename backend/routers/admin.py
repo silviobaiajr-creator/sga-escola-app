@@ -44,6 +44,13 @@ class UserCreate(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = "teacher"
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+
 class TeacherClassCreate(BaseModel):
     teacher_id: str
     class_id: int
@@ -253,6 +260,28 @@ def create_user(body: UserCreate, db: Session = Depends(get_db)):
     )
     db.add(obj); db.commit(); db.refresh(obj)
     return {"id": str(obj.id), "username": obj.username}
+
+@router.put("/users/{user_id}")
+def update_user(user_id: str, body: UserUpdate, db: Session = Depends(get_db)):
+    import uuid as _uuid
+    import hashlib
+    obj = db.query(models.User).get(_uuid.UUID(user_id))
+    if not obj:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    
+    if body.username is not None:
+        obj.username = body.username
+    if body.full_name is not None:
+        obj.full_name = body.full_name
+    if body.email is not None:
+        obj.email = body.email
+    if body.role is not None:
+        obj.role = body.role
+    if body.password:
+        obj.password = hashlib.sha256(body.password.encode()).hexdigest()
+        
+    db.commit()
+    return {"ok": True, "id": str(obj.id)}
 
 @router.put("/users/{user_id}/toggle-active")
 def toggle_user_active(user_id: str, db: Session = Depends(get_db)):
