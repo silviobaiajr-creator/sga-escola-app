@@ -191,17 +191,23 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
     const canReopen = r.status === "approved" && (userRole === "admin" || userRole === "coordinator");
 
     return (
-        <div className={`rounded-xl border p-3 ${levelColors[r.level] || ""}`}>
-            <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1 flex-1">
-                    <p className="text-xs font-semibold">{levelLabels[r.level]}</p>
+        <div className={`rounded-xl border p-3.5 ${levelColors[r.level] || ""}`}>
+            <div className="flex flex-col gap-3">
 
+                {/* Cabeçalho: Título e Status */}
+                <div className="flex items-center justify-between gap-2 border-b border-border/30 pb-2">
+                    <p className="text-xs font-bold uppercase tracking-wider">{levelLabels[r.level]}</p>
+                    <StatusBadge status={r.status} />
+                </div>
+
+                {/* Corpo: Texto ou Área de Edição - Agora 100% da largura */}
+                <div className="w-full">
                     {isEditing ? (
-                        <div className="mt-2 space-y-2">
-                            <textarea className="input text-xs min-h-[80px]" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                        <div className="mt-1 space-y-2">
+                            <textarea className="input text-xs min-h-[90px] w-full" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                             <div className="flex gap-2">
                                 <button onClick={onSave} disabled={acting} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-1.5 px-3 rounded-lg flex gap-1 items-center transition-colors">
-                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Enviar para Aprovação
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Enviar
                                 </button>
                                 <button onClick={() => { setIsEditing(false); setEditDesc(r.description); }} className="bg-secondary hover:bg-secondary/80 text-foreground text-xs py-1.5 px-3 rounded-lg transition-colors">Cancelar</button>
                             </div>
@@ -211,7 +217,7 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                             <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
                             {r.approvals && r.approvals.length > 0 && (
                                 <div className="mt-3">
-                                    <button onClick={() => setIsHistoryOpen(true)} className="text-[10px] font-medium text-primary hover:underline flex items-center gap-1">
+                                    <button onClick={() => setIsHistoryOpen(true)} className="text-[10px] font-medium text-primary hover:underline flex items-center gap-1 w-fit">
                                         <Clock className="w-3 h-3" /> Ver Histórico de Modificações ({r.approvals.length})
                                     </button>
                                     <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} approvals={r.approvals} title={`Rubrica ${levelLabels[r.level]}`} currentDescription={r.description} />
@@ -220,41 +226,44 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                         </>
                     )}
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                    <StatusBadge status={r.status} />
 
-                    {/* Approvals List */}
-                    {r.required_teachers?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 justify-end max-w-[160px] mt-1">
-                            {r.required_teachers.map((rt: any) => {
-                                const hasApproved = recentApprovals.some((a: any) => a.teacher_id === rt.id && a.action === "approved");
-                                return (
-                                    <span key={rt.id} className={`text-[9px] rounded border px-1.5 py-0.5 font-medium ${hasApproved ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-red-500/5 text-red-500/60 dark:text-red-400/60 border-red-500/20"}`}>
-                                        {hasApproved ? "✓" : "⏳"} {rt.name.split(" ")[0]}
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    )}
+                {/* Rodapé: Carimbos e Ações */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-border/30">
+
+                    {/* Lista de Aprovações */}
+                    <div className="flex-1">
+                        {r.required_teachers?.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                                {r.required_teachers.map((rt: any) => {
+                                    const hasApproved = recentApprovals.some((a: any) => a.teacher_id === rt.id && a.action === "approved");
+                                    return (
+                                        <span key={rt.id} className={`text-[9px] rounded-md border px-1.5 py-0.5 font-medium flex items-center gap-1 ${hasApproved ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-red-500/5 text-red-500/60 dark:text-red-400/60 border-red-500/20"}`}>
+                                            {hasApproved ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Clock className="w-2.5 h-2.5" />} {rt.name.split(" ")[0]}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
                     {!isEditing && (
-                        <div className="flex gap-1.5 mt-1">
+                        <div className="flex items-center gap-1.5 justify-end shrink-0">
                             {canAct && (
                                 <button onClick={() => { setActing(true); handleApprove(r.id, "approved").finally(() => setActing(false)); }} disabled={acting}
-                                    className="rounded-lg bg-emerald-500 p-1.5 text-white hover:bg-emerald-600 transition-colors shadow-sm" title="Aprovar">
-                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                    className="rounded-lg bg-emerald-500 py-1.5 px-3 text-white focus:ring-2 focus:ring-emerald-500/50 hover:bg-emerald-600 transition-colors shadow-sm text-xs font-medium flex gap-1 items-center" title="Aprovar">
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} Aprovar
                                 </button>
                             )}
                             {canEdit && (
                                 <button onClick={() => setIsEditing(true)}
-                                    className="rounded-lg bg-secondary p-1.5 text-foreground hover:bg-secondary/80 transition-colors border border-border shadow-sm" title="Editar">
-                                    <Edit3 className="h-3 w-3" />
+                                    className="rounded-lg bg-secondary py-1.5 px-3 text-foreground hover:bg-secondary/80 transition-colors border border-border shadow-sm text-xs font-medium focus:ring-2 focus:ring-primary/20 flex gap-1 items-center" title="Editar">
+                                    <Edit3 className="h-3 w-3" /> Editar
                                 </button>
                             )}
                             {canReopen && (
                                 <button onClick={() => { setActing(true); handleApprove(r.id, "reopen").finally(() => setActing(false)); }} disabled={acting}
-                                    className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-1.5 text-amber-500 hover:bg-amber-500/20 transition-colors shadow-sm" title="Reabrir Edição">
-                                    <X className="h-3 w-3" />
+                                    className="rounded-lg bg-amber-500/10 border border-amber-500/30 py-1.5 px-2 text-amber-500 hover:bg-amber-500/20 transition-colors shadow-sm focus:ring-2 focus:ring-amber-500/20" title="Reabrir Edição">
+                                    {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
                                 </button>
                             )}
                         </div>
