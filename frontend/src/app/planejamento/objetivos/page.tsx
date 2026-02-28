@@ -180,8 +180,8 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                                                         </span>
                                                         {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
                                                         {a.action === 'edited' && a.previous_description && (
-                                                            <div className="mt-1 p-1 bg-background rounded border border-border">
-                                                                <span className="opacity-70 line-through text-red-400 break-words whitespace-pre-wrap">{a.previous_description}</span>
+                                                            <div className="mt-1 p-2 bg-background rounded border border-border">
+                                                                <DiffText oldText={a.previous_description} newText={r.description} />
                                                             </div>
                                                         )}
                                                     </div>
@@ -346,7 +346,7 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                                                             {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
                                                             {a.action === 'edited' && a.previous_description && (
                                                                 <div className="mt-1 p-2 bg-background rounded border border-border">
-                                                                    <span className="opacity-70 line-through text-red-400 break-words whitespace-pre-wrap">{a.previous_description}</span>
+                                                                    <DiffText oldText={a.previous_description} newText={obj.description} />
                                                                 </div>
                                                             )}
                                                         </div>

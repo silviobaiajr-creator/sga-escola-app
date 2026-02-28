@@ -107,27 +107,38 @@ export default function AvaliacaoPage() {
             bimester: fetchPastBimesters ? undefined : selectedBimester,
         }).then(r => {
             const allObjs = r.data || [];
-            const approved = allObjs.filter((o: any) => o.status === "approved" && o.rubrics_status === "approved");
 
-            // Fazer a checagem manual de bimestres passados (tratando strings/nums)
-            const finalObjs = fetchPastBimesters
-                ? approved.filter((o: any) => Number(o.bimester) <= selectedBimester)
-                : approved;
-
-            // Extrair habilidades únicas
+            // Agrupar por habilidade e validar se TODAS as rubricas/objetivos daquela habilidade estão aprovados
+            const skillStatusMap: Record<string, boolean> = {}; // true se tudo aprovado
             const skillsMap: Record<string, any> = {};
-            finalObjs.forEach((o: any) => {
+
+            allObjs.forEach((o: any) => {
                 const code = o.bncc_code || "Sem BNCC";
-                if (!skillsMap[code]) {
+                const isApproved = o.status === "approved" && o.rubrics_status === "approved";
+
+                if (skillStatusMap[code] === undefined) {
+                    skillStatusMap[code] = true;
                     skillsMap[code] = {
                         bncc_code: code,
                         description: o.bncc_description || o.description,
                         bimester: Number(o.bimester)
                     };
                 }
+
+                if (!isApproved) {
+                    skillStatusMap[code] = false;
+                }
             });
 
-            setSkills(Object.values(skillsMap));
+            // Filtrar apenas habilidades onde TUDO foi aprovado
+            const validSkills = Object.values(skillsMap).filter((sk: any) => skillStatusMap[sk.bncc_code] === true);
+
+            // Fazer a checagem manual de bimestres passados (tratando strings/nums)
+            const finalSkills = fetchPastBimesters
+                ? validSkills.filter((sk: any) => sk.bimester <= selectedBimester)
+                : validSkills.filter((sk: any) => sk.bimester === selectedBimester);
+
+            setSkills(finalSkills);
         }).catch(() => setSkills([]));
 
         setSelectedSkill(null);
