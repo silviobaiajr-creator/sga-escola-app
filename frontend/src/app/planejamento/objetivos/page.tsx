@@ -50,14 +50,10 @@ function ReviewModal({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-5xl max-h-[95vh] h-[800px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/30 shrink-0">
-                    <h2 className="text-lg font-bold flex items-center gap-2">
-                        {canEdit ? <Edit3 className="w-5 h-5 text-primary" /> : <Clock className="w-5 h-5 text-primary" />}
-                        {canEdit ? `Revisar e Editar - ${title}` : `Histórico - ${title}`}
-                    </h2>
-                    <button onClick={onClose} className="p-2 hover:bg-secondary rounded-full border border-transparent hover:border-border transition-colors"><X className="w-5 h-5 text-muted-foreground" /></button>
-                </div>
+            <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-5xl max-h-[95vh] h-[800px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative">
+                <button onClick={onClose} className="absolute right-4 top-4 z-10 p-2 bg-background/50 backdrop-blur-md hover:bg-secondary rounded-full border border-border shadow-sm transition-colors">
+                    <X className="w-5 h-5 text-muted-foreground" />
+                </button>
 
                 <div className="flex-1 overflow-y-auto p-0 flex flex-col lg:flex-row h-full">
                     {/* Area de Edição / Leitura */}
@@ -75,9 +71,9 @@ function ReviewModal({
                                     placeholder="Modifique o texto aqui..."
                                 />
                                 <div className="flex gap-3 shrink-0">
-                                    <button onClick={onClose} className="btn-secondary flex-1 py-3 text-sm">Cancelar</button>
-                                    <button onClick={onSave} disabled={acting} className="btn-primary flex-[2] flex justify-center items-center gap-2 py-3 text-sm shadow-md">
-                                        {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Enviar Alterações para Aprovação
+                                    <button onClick={onClose} className="btn-secondary flex-1 py-2 text-sm">Cancelar</button>
+                                    <button onClick={onSave} disabled={acting} className="btn-primary flex-[2] flex justify-center items-center gap-2 py-2 text-sm shadow-md">
+                                        {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar e enviar
                                     </button>
                                 </div>
                             </div>
@@ -257,13 +253,6 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                 {/* Corpo: Texto - Agora 100% da largura, sem textarea inline */}
                 <div className="w-full">
                     <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
-                    {r.approvals && r.approvals.length > 0 && (
-                        <div className="mt-3">
-                            <button onClick={() => setIsReviewModalOpen(true)} className="text-[10px] font-medium text-primary hover:underline flex items-center gap-1 w-fit">
-                                <Clock className="w-3 h-3" /> Ver Histórico de Modificações ({r.approvals.length})
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 <ReviewModal
@@ -402,13 +391,6 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                         </div>
 
                         <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
-                        {obj.approvals && obj.approvals.length > 0 && (
-                            <div className="mt-4">
-                                <button onClick={() => setIsReviewModalOpen(true)} className="text-xs font-medium text-primary hover:underline flex items-center gap-1 w-fit">
-                                    <Clock className="w-3.5 h-3.5" /> Ver Histórico de Modificações ({obj.approvals.length})
-                                </button>
-                            </div>
-                        )}
 
                         <ReviewModal
                             isOpen={isReviewModalOpen}
