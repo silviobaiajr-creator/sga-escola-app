@@ -65,9 +65,19 @@ function ReviewModal({
                         {canEdit ? (
                             <div className="flex flex-col flex-1 gap-4">
                                 <textarea
-                                    className="input text-sm flex-1 resize-none w-full p-4"
+                                    className="input text-sm flex-1 resize-none overflow-hidden w-full p-4"
                                     value={editDesc}
-                                    onChange={e => setEditDesc(e.target.value)}
+                                    onChange={e => {
+                                        setEditDesc(e.target.value);
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = `${e.target.scrollHeight}px`;
+                                    }}
+                                    ref={el => {
+                                        if (el) {
+                                            el.style.height = 'auto';
+                                            el.style.height = `${el.scrollHeight}px`;
+                                        }
+                                    }}
                                     placeholder="Modifique o texto aqui..."
                                 />
                                 <div className="flex gap-3 shrink-0">
@@ -600,10 +610,11 @@ export default function ObjetivosPage() {
     const [batchEditValues, setBatchEditValues] = useState<Record<string, string>>({});
 
     const openBatchEdit = (groupCode: string, items: any[]) => {
+        const editableItems = items.filter(o => o.status !== "approved");
         const initialValues: Record<string, string> = {};
-        items.forEach(o => { initialValues[o.id] = o.description; });
+        editableItems.forEach(o => { initialValues[o.id] = o.description; });
         setBatchEditValues(initialValues);
-        setBatchEditModal({ isOpen: true, groupCode, items });
+        setBatchEditModal({ isOpen: true, groupCode, items: editableItems });
     };
 
     const handleBatchSave = async () => {
@@ -791,9 +802,19 @@ export default function ObjetivosPage() {
                                                 </div>
                                             )}
                                             <textarea
-                                                className="input text-sm min-h-[80px]"
+                                                className="input text-sm min-h-[80px] resize-none overflow-hidden"
                                                 value={batchEditValues[o.id]}
-                                                onChange={(e) => setBatchEditValues({ ...batchEditValues, [o.id]: e.target.value })}
+                                                onChange={(e) => {
+                                                    setBatchEditValues({ ...batchEditValues, [o.id]: e.target.value });
+                                                    e.target.style.height = 'auto';
+                                                    e.target.style.height = `${e.target.scrollHeight}px`;
+                                                }}
+                                                ref={el => {
+                                                    if (el) {
+                                                        el.style.height = 'auto';
+                                                        el.style.height = `${el.scrollHeight}px`;
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     );
