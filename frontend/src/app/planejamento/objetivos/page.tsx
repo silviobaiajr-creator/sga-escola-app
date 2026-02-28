@@ -27,6 +27,51 @@ function DiffText({ oldText, newText }: { oldText: string, newText: string }) {
 }
 
 // ─────────────────────────────────────────
+// HISTORY MODAL
+// ─────────────────────────────────────────
+function HistoryModal({ isOpen, onClose, approvals, title, currentDescription }: { isOpen: boolean; onClose: () => void; approvals: any[]; title: string; currentDescription: string }) {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/30">
+                    <h2 className="text-lg font-bold flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Histórico de Modificações - {title}</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-secondary rounded-full border border-transparent hover:border-border transition-colors"><X className="w-5 h-5 text-muted-foreground" /></button>
+                </div>
+                <div className="p-6 overflow-y-auto flex-1 space-y-0">
+                    {approvals.length === 0 ? <p className="text-muted-foreground">Nenhuma modificação registrada.</p> : approvals.map((a: any, i: number) => (
+                        <div key={i} className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                                <div className="w-4 h-4 rounded-full bg-primary/20 border-2 border-primary mt-1 shadow-sm shrink-0"></div>
+                                {i < approvals.length - 1 && <div className="w-0.5 h-full bg-border my-1"></div>}
+                            </div>
+                            <div className="flex-1 pb-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                                    <span className="font-mono bg-secondary px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap border border-border shadow-sm">{new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                    <strong className="text-foreground text-sm">{a.teacher_name}</strong>
+                                    <span className={`text-xs font-bold border px-1.5 py-0.5 rounded-md ${a.action === 'approved' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : a.action === 'rejected' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 'text-blue-500 bg-blue-500/10 border-blue-500/20'}`}>
+                                        {a.action === 'approved' ? 'Aprovou' : a.action === 'rejected' ? 'Rejeitou' : a.action === 'edited' ? 'Editou' : a.action === 'reopen' ? 'Reabriu' : a.action}
+                                    </span>
+                                </div>
+                                {a.notes && <p className="italic text-muted-foreground text-sm mb-3">"{a.notes}"</p>}
+                                {a.action === 'edited' && a.previous_description && (
+                                    <div className="p-4 bg-secondary/30 rounded-xl border border-border mt-2 shadow-sm">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> Alterações detectadas:</p>
+                                        <div className="text-sm">
+                                            <DiffText oldText={a.previous_description} newText={currentDescription} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────
 // STATUS BADGE
 // ─────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -104,7 +149,7 @@ function RubricsPanel({ objectiveId, teacherId, userRole, objectiveStatus, setOb
     }
 
     return (
-        <div className="space-y-2 p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
             {rubrics.map((r: any) => (
                 <RubricItem key={r.id} r={r} teacherId={teacherId} userRole={userRole} levelColors={levelColors} levelLabels={levelLabels} handleApprove={handleApprove} />
             ))}
@@ -116,6 +161,7 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
     const [isEditing, setIsEditing] = useState(false);
     const [editDesc, setEditDesc] = useState(r.description);
     const [acting, setActing] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     const onSave = async () => {
         if (editDesc === r.description) {
@@ -165,30 +211,10 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                             <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
                             {r.approvals && r.approvals.length > 0 && (
                                 <div className="mt-3">
-                                    <details className="group">
-                                        <summary className="text-[10px] cursor-pointer font-medium text-primary hover:underline flex items-center gap-1">
-                                            <Clock className="w-3 h-3" /> Ver Histórico de Modificações ({r.approvals.length})
-                                        </summary>
-                                        <div className="mt-2 space-y-2 pl-2 border-l-2 border-border max-h-40 overflow-y-auto pr-2">
-                                            {r.approvals.map((a: any, i: number) => (
-                                                <div key={i} className="text-[10px] text-muted-foreground flex items-start gap-2">
-                                                    <span className="shrink-0 font-mono bg-secondary px-1 py-0.5 rounded">{new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                                                    <div className="flex-1">
-                                                        <strong className="text-foreground">{a.teacher_name}</strong>
-                                                        <span className={a.action === 'approved' ? 'text-emerald-500 ml-1' : a.action === 'rejected' ? 'text-red-500 ml-1' : 'text-blue-500 ml-1'}>
-                                                            {a.action === 'approved' ? 'Aprovou' : a.action === 'rejected' ? 'Rejeitou' : a.action === 'edited' ? 'Editou' : a.action === 'reopen' ? 'Reabriu' : a.action}
-                                                        </span>
-                                                        {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
-                                                        {a.action === 'edited' && a.previous_description && (
-                                                            <div className="mt-1 p-2 bg-background rounded border border-border">
-                                                                <DiffText oldText={a.previous_description} newText={r.description} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </details>
+                                    <button onClick={() => setIsHistoryOpen(true)} className="text-[10px] font-medium text-primary hover:underline flex items-center gap-1">
+                                        <Clock className="w-3 h-3" /> Ver Histórico de Modificações ({r.approvals.length})
+                                    </button>
+                                    <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} approvals={r.approvals} title={`Rubrica ${levelLabels[r.level]}`} currentDescription={r.description} />
                                 </div>
                             )}
                         </>
@@ -248,6 +274,7 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
     const [isEditing, setIsEditing] = useState(false);
     const [editDesc, setEditDesc] = useState(obj.description);
     const [rubricStatus, setRubricStatus] = useState<string>("none");
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     const handleAction = async (action: string, newDesc?: string) => {
         setActing(true);
@@ -330,30 +357,10 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                                 <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
                                 {obj.approvals && obj.approvals.length > 0 && (
                                     <div className="mt-4">
-                                        <details className="group">
-                                            <summary className="text-xs cursor-pointer font-medium text-primary hover:underline flex items-center gap-1 w-fit">
-                                                <Clock className="w-3.5 h-3.5" /> Ver Histórico de Modificações ({obj.approvals.length})
-                                            </summary>
-                                            <div className="mt-3 space-y-2 pl-3 border-l-2 border-border max-h-48 overflow-y-auto pr-2">
-                                                {obj.approvals.map((a: any, i: number) => (
-                                                    <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                                                        <span className="shrink-0 font-mono bg-secondary px-1.5 py-0.5 rounded">{new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                                                        <div className="flex-1">
-                                                            <strong className="text-foreground">{a.teacher_name}</strong>
-                                                            <span className={a.action === 'approved' ? 'text-emerald-500 ml-1' : a.action === 'rejected' ? 'text-red-500 ml-1' : 'text-blue-500 ml-1'}>
-                                                                {a.action === 'approved' ? 'Aprovou' : a.action === 'rejected' ? 'Rejeitou' : a.action === 'edited' ? 'Editou' : a.action === 'reopen' ? 'Reabriu' : a.action}
-                                                            </span>
-                                                            {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
-                                                            {a.action === 'edited' && a.previous_description && (
-                                                                <div className="mt-1 p-2 bg-background rounded border border-border">
-                                                                    <DiffText oldText={a.previous_description} newText={obj.description} />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </details>
+                                        <button onClick={() => setIsHistoryOpen(true)} className="text-xs font-medium text-primary hover:underline flex items-center gap-1 w-fit">
+                                            <Clock className="w-3.5 h-3.5" /> Ver Histórico de Modificações ({obj.approvals.length})
+                                        </button>
+                                        <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} approvals={obj.approvals} title={`Objetivo ${obj.order_index}`} currentDescription={obj.description} />
                                     </div>
                                 )}
                             </>
@@ -457,13 +464,23 @@ export default function ObjetivosPage() {
 
     useEffect(() => {
         getDisciplines().then(r => {
-            setDisciplines(r.data);
+            const discs = r.data || [];
+            setDisciplines(discs);
             getTeacherClass().then(tc => {
                 const myClasses = tc.data || [];
                 if (myClasses.length > 0) {
-                    setSelectedDisc(String(myClasses[0].discipline_id));
+                    const firstDiscId = myClasses[0].discipline_id || myClasses[0].discipline?.id;
+                    if (firstDiscId) {
+                        setSelectedDisc(String(firstDiscId));
+                    } else if (discs.length > 0) {
+                        setSelectedDisc(String(discs[0].id));
+                    }
+                } else if (discs.length > 0) {
+                    setSelectedDisc(String(discs[0].id));
                 }
-            }).catch(() => { });
+            }).catch(() => {
+                if (discs.length > 0) setSelectedDisc(String(discs[0].id));
+            });
         }).catch(() => { });
 
         getClassesYears().then(r => {
