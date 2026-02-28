@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel, getTeacherClass } from "@/lib/api";
 import { diffWords } from "diff";
+import TextareaAutosize from 'react-textarea-autosize';
 
 // ─────────────────────────────────────────
 // Utils
@@ -64,20 +65,11 @@ function ReviewModal({
                         </p>
                         {canEdit ? (
                             <div className="flex flex-col flex-1 gap-4">
-                                <textarea
-                                    className="input text-sm flex-1 resize-none overflow-hidden w-full p-4"
+                                <TextareaAutosize
+                                    className="input text-sm resize-none w-full p-4 overflow-hidden"
+                                    minRows={4}
                                     value={editDesc}
-                                    onChange={e => {
-                                        setEditDesc(e.target.value);
-                                        e.target.style.height = 'auto';
-                                        e.target.style.height = `${e.target.scrollHeight}px`;
-                                    }}
-                                    ref={el => {
-                                        if (el) {
-                                            el.style.height = 'auto';
-                                            el.style.height = `${el.scrollHeight}px`;
-                                        }
-                                    }}
+                                    onChange={e => setEditDesc(e.target.value)}
                                     placeholder="Modifique o texto aqui..."
                                 />
                                 <div className="flex gap-3 shrink-0">
@@ -725,32 +717,36 @@ export default function ObjetivosPage() {
                         {displayGroups.map((group) => {
                             return (
                                 <div key={group.code} className="space-y-4">
-                                    <div className="px-1 border-b pb-2 flex items-start justify-between">
-                                        <div>
+                                    <div className="px-1 border-b pb-3 flex flex-col gap-3">
+                                        <div className="flex items-center justify-between">
                                             <h3 className="text-lg font-bold flex items-center gap-3">
                                                 <span className="bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-lg text-sm font-mono border border-emerald-500/20">{group.code}</span>
                                                 <StatusBadge status={group.skillStatus} />
                                             </h3>
-                                            {group.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-3xl">{group.description}</p>}
-                                        </div>
 
-                                        {/* Ações Rápidas (Batch) */}
-                                        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-                                            {group.items.some((o: any) => o.status !== "approved") && (
-                                                <button onClick={() => openBatchEdit(group.code, group.items)}
-                                                    className="bg-secondary/80 text-foreground border border-border hover:bg-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
-                                                    <Edit3 className="h-3.5 w-3.5" />
-                                                    Editar Objetivos
-                                                </button>
-                                            )}
-                                            {group.items.some((o: any) => o.status === "pending" || o.status === "draft") && (
-                                                <button onClick={() => handleBatchApproveObjectives(group.code, group.items)} disabled={!!batchActing}
-                                                    className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
-                                                    {batchActing === `obj_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                                                    Aprovar Todos (Obj)
-                                                </button>
-                                            )}
+                                            {/* Ações Rápidas (Batch) */}
+                                            <div className="flex flex-col sm:flex-row items-end gap-2 shrink-0">
+                                                {group.items.some((o: any) => o.status !== "approved") && (
+                                                    <button onClick={() => openBatchEdit(group.code, group.items)}
+                                                        className="bg-secondary/80 text-foreground border border-border hover:bg-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                                                        <Edit3 className="h-3.5 w-3.5" />
+                                                        Editar Objetivos
+                                                    </button>
+                                                )}
+                                                {group.items.some((o: any) => o.status === "pending" || o.status === "draft") && (
+                                                    <button onClick={() => handleBatchApproveObjectives(group.code, group.items)} disabled={!!batchActing}
+                                                        className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                                                        {batchActing === `obj_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                                        Aprovar Todos (Obj)
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
+                                        {group.description && (
+                                            <div className="w-full">
+                                                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{group.description}</p>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="grid gap-3 border-l-2 border-emerald-500/30 pl-4 py-1">
                                         {group.items.map((o: any) => (
@@ -801,20 +797,11 @@ export default function ObjetivosPage() {
                                                     <DiffText oldText={lastEdit.previous_description} newText={o.description} />
                                                 </div>
                                             )}
-                                            <textarea
-                                                className="input text-sm min-h-[80px] resize-none overflow-hidden"
+                                            <TextareaAutosize
+                                                className="input text-sm w-full resize-none overflow-hidden"
+                                                minRows={3}
                                                 value={batchEditValues[o.id]}
-                                                onChange={(e) => {
-                                                    setBatchEditValues({ ...batchEditValues, [o.id]: e.target.value });
-                                                    e.target.style.height = 'auto';
-                                                    e.target.style.height = `${e.target.scrollHeight}px`;
-                                                }}
-                                                ref={el => {
-                                                    if (el) {
-                                                        el.style.height = 'auto';
-                                                        el.style.height = `${el.scrollHeight}px`;
-                                                    }
-                                                }}
+                                                onChange={(e) => setBatchEditValues({ ...batchEditValues, [o.id]: e.target.value })}
                                             />
                                         </div>
                                     );
