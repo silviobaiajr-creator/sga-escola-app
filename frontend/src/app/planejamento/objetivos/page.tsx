@@ -6,7 +6,7 @@ import {
     FileCheck2, CheckCircle2, XCircle, Loader2, ChevronDown,
     ChevronUp, AlertTriangle, BookOpen, Clock, Info, Edit3, Save, X
 } from "lucide-react";
-import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel } from "@/lib/api";
+import { getDisciplines, getClassesYears, getObjectives, approveObjective, getRubrics, generateRubrics, approveRubricLevel, getTeacherClass } from "@/lib/api";
 import { diffWords } from "diff";
 
 // ─────────────────────────────────────────
@@ -162,15 +162,35 @@ function RubricItem({ r, teacherId, userRole, levelColors, levelLabels, handleAp
                         </div>
                     ) : (
                         <>
-                            {lastEdit && (
-                                <div className="mb-2 rounded-lg bg-background/50 p-2 border border-border">
-                                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1">
-                                        <Info className="w-3 h-3" /> Modificações Requeridas (por {lastEdit.teacher_name}):
-                                    </p>
-                                    <DiffText oldText={lastEdit.previous_description} newText={r.description} />
+                            <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
+                            {r.approvals && r.approvals.length > 0 && (
+                                <div className="mt-3">
+                                    <details className="group">
+                                        <summary className="text-[10px] cursor-pointer font-medium text-primary hover:underline flex items-center gap-1">
+                                            <Clock className="w-3 h-3" /> Ver Histórico de Modificações ({r.approvals.length})
+                                        </summary>
+                                        <div className="mt-2 space-y-2 pl-2 border-l-2 border-border max-h-40 overflow-y-auto pr-2">
+                                            {r.approvals.map((a: any, i: number) => (
+                                                <div key={i} className="text-[10px] text-muted-foreground flex items-start gap-2">
+                                                    <span className="shrink-0 font-mono bg-secondary px-1 py-0.5 rounded">{new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <div className="flex-1">
+                                                        <strong className="text-foreground">{a.teacher_name}</strong>
+                                                        <span className={a.action === 'approved' ? 'text-emerald-500 ml-1' : a.action === 'rejected' ? 'text-red-500 ml-1' : 'text-blue-500 ml-1'}>
+                                                            {a.action === 'approved' ? 'Aprovou' : a.action === 'rejected' ? 'Rejeitou' : a.action === 'edited' ? 'Editou' : a.action === 'reopen' ? 'Reabriu' : a.action}
+                                                        </span>
+                                                        {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
+                                                        {a.action === 'edited' && a.previous_description && (
+                                                            <div className="mt-1 p-1 bg-background rounded border border-border">
+                                                                <span className="opacity-70 line-through text-red-400 break-words whitespace-pre-wrap">{a.previous_description}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </details>
                                 </div>
                             )}
-                            <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{r.description}</p>
                         </>
                     )}
                 </div>
@@ -265,16 +285,25 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
     // Lógica para status composto
     let compoundMsg = "";
     if (obj.status === "approved") {
-        const statuses = obj.rubric_levels?.map((rl: any) => rl.status) || [];
-        // Se as rubricas que vieram populadas do backend tiverem "pending" ou se faltam rubricas
-        if (statuses.includes("pending") || (!obj.has_rubrics && statuses.length === 0)) {
+        if (!obj.has_rubrics || obj.rubrics_status === "pending") {
             compoundMsg = "Objetivo Aprovado, aguardando Rubricas.";
-        }
-        // Se há rubricas e todas tão approved
-        else if (obj.has_rubrics && !statuses.includes("pending") && !statuses.includes("rejected")) {
+        } else if (obj.rubrics_status === "approved") {
             compoundMsg = "Objetivo e Rubricas Aprovados. ✅";
         }
     }
+
+    const handleApproveAllRubrics = async () => {
+        setActing(true);
+        try {
+            const r = await getRubrics(obj.id);
+            const rubricas = r.data || [];
+            const pends = rubricas.filter((ru: any) => ru.status === "pending" || ru.status === "draft");
+            const promessas = pends.map((ru: any) => approveRubricLevel(ru.id, { teacher_id: teacherId, action: "approved" }));
+            await Promise.all(promessas);
+            onRefresh();
+        } catch (e: any) { alert("Erro ao aprovar rubricas em lote."); }
+        finally { setActing(false); }
+    };
 
     return (
         <div className={`rounded-2xl border transition-all overflow-hidden ${obj.status === "approved" ? "bg-card border-emerald-500/30" : "bg-card/60 border-border"}`}>
@@ -298,15 +327,35 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                             </div>
                         ) : (
                             <>
-                                {lastEdit && (
-                                    <div className="mb-3 rounded-xl bg-secondary/50 p-3 border border-border">
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                            <Info className="w-3.5 h-3.5" /> Modificações (por {lastEdit.teacher_name}):
-                                        </p>
-                                        <DiffText oldText={lastEdit.previous_description} newText={obj.description} />
+                                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
+                                {obj.approvals && obj.approvals.length > 0 && (
+                                    <div className="mt-4">
+                                        <details className="group">
+                                            <summary className="text-xs cursor-pointer font-medium text-primary hover:underline flex items-center gap-1 w-fit">
+                                                <Clock className="w-3.5 h-3.5" /> Ver Histórico de Modificações ({obj.approvals.length})
+                                            </summary>
+                                            <div className="mt-3 space-y-2 pl-3 border-l-2 border-border max-h-48 overflow-y-auto pr-2">
+                                                {obj.approvals.map((a: any, i: number) => (
+                                                    <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                                                        <span className="shrink-0 font-mono bg-secondary px-1.5 py-0.5 rounded">{new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                                                        <div className="flex-1">
+                                                            <strong className="text-foreground">{a.teacher_name}</strong>
+                                                            <span className={a.action === 'approved' ? 'text-emerald-500 ml-1' : a.action === 'rejected' ? 'text-red-500 ml-1' : 'text-blue-500 ml-1'}>
+                                                                {a.action === 'approved' ? 'Aprovou' : a.action === 'rejected' ? 'Rejeitou' : a.action === 'edited' ? 'Editou' : a.action === 'reopen' ? 'Reabriu' : a.action}
+                                                            </span>
+                                                            {a.notes && <p className="mt-0.5 italic text-muted-foreground/80">"{a.notes}"</p>}
+                                                            {a.action === 'edited' && a.previous_description && (
+                                                                <div className="mt-1 p-2 bg-background rounded border border-border">
+                                                                    <span className="opacity-70 line-through text-red-400 break-words whitespace-pre-wrap">{a.previous_description}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
                                     </div>
                                 )}
-                                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{obj.description}</p>
                             </>
                         )}
                     </div>
@@ -340,6 +389,13 @@ function ObjectiveItem({ obj, teacherId, userRole, onRefresh }: { obj: any; teac
                                     className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-500 hover:bg-amber-500/20 disabled:opacity-50 shadow-sm transition-colors">
                                     {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                                     Reabrir Edição
+                                </button>
+                            )}
+                            {obj.status === "approved" && obj.has_rubrics && obj.rubrics_status !== "approved" && (
+                                <button onClick={handleApproveAllRubrics} disabled={acting}
+                                    className="flex items-center gap-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-500 hover:bg-blue-500/20 disabled:opacity-50 shadow-sm transition-colors">
+                                    {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                    Aprovar Todas (Rubricas)
                                 </button>
                             )}
                         </div>
@@ -400,7 +456,16 @@ export default function ObjetivosPage() {
         : "";
 
     useEffect(() => {
-        getDisciplines().then(r => setDisciplines(r.data)).catch(() => { });
+        getDisciplines().then(r => {
+            setDisciplines(r.data);
+            getTeacherClass().then(tc => {
+                const myClasses = tc.data || [];
+                if (myClasses.length > 0) {
+                    setSelectedDisc(String(myClasses[0].discipline_id));
+                }
+            }).catch(() => { });
+        }).catch(() => { });
+
         getClassesYears().then(r => {
             const yList = r.data || [];
             setAvailableYears(yList);
@@ -510,26 +575,7 @@ export default function ObjetivosPage() {
         finally { setBatchActing(null); }
     };
 
-    const handleBatchApproveRubrics = async (groupCode: string, items: any[]) => {
-        setBatchActing(`rub_${groupCode}`);
-        try {
-            const approvedObjs = items.filter(o => o.status === "approved" && o.has_rubrics);
-            const promessas: Promise<any>[] = [];
 
-            // Para cada objetivo, precisamos buscar as rubricas atuais e aprovar as pendentes
-            for (const obj of approvedObjs) {
-                const r = await getRubrics(obj.id);
-                const rubricas = r.data || [];
-                const pends = rubricas.filter((ru: any) => ru.status === "pending" || ru.status === "draft");
-                for (const ru of pends) {
-                    promessas.push(approveRubricLevel(ru.id, { teacher_id: teacherId, action: "approved" }));
-                }
-            }
-            if (promessas.length > 0) await Promise.all(promessas);
-            load();
-        } catch (e: any) { alert(e?.response?.data?.detail || "Erro ao aprovar rubricas em lote."); }
-        finally { setBatchActing(null); }
-    };
 
     return (
         <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
@@ -633,13 +679,6 @@ export default function ObjetivosPage() {
                                                     className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
                                                     {batchActing === `obj_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                                                     Aprovar Todos (Obj)
-                                                </button>
-                                            )}
-                                            {group.items.some((o: any) => o.status === "approved" && o.has_rubrics && o.rubrics_status !== "approved") && (
-                                                <button onClick={() => handleBatchApproveRubrics(group.code, group.items)} disabled={!!batchActing}
-                                                    className="bg-blue-500/10 text-blue-500 border border-blue-500/30 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
-                                                    {batchActing === `rub_${group.code}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                                                    Aprovar Todas (Rubricas)
                                                 </button>
                                             )}
                                         </div>

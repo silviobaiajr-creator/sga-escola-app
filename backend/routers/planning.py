@@ -161,6 +161,7 @@ def list_objectives(
 
     result = []
     for r in rows:
+        sorted_approvals = sorted(r.approvals, key=lambda a: a.created_at.timestamp() if a.created_at else 0)
         approvals = [
             {
                 "teacher_id": str(a.teacher_id), 
@@ -170,7 +171,7 @@ def list_objectives(
                 "created_at": str(a.created_at),
                 "previous_description": a.previous_description
             }
-            for a in r.approvals
+            for a in sorted_approvals
         ]
         has_rubrics = len(r.rubric_levels) > 0
         all_rubrics_approved = has_rubrics and all(rl.status == "approved" for rl in r.rubric_levels)
@@ -453,7 +454,7 @@ def get_rubrics(objective_id: str, db: Session = Depends(get_db)):
                     "created_at": str(a.created_at),
                     "previous_description": a.previous_description
                 }
-                for a in r.approvals
+                for a in sorted(r.approvals, key=lambda a: a.created_at.timestamp() if a.created_at else 0)
             ]
         }
         for r in levels

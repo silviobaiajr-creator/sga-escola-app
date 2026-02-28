@@ -115,7 +115,12 @@ def get_dashboard(
     total_students = db.query(models.Student).filter_by(status="active").count()
     total_assessments = db.query(models.Assessment).count()
     approved_objectives = db.query(models.LearningObjective).filter_by(status="approved").count()
-    pending_approvals = db.query(models.LearningObjective).filter_by(status="pending").count()
+    pending_objs = db.query(models.LearningObjective).filter_by(status="pending").count()
+    pending_rubs = db.query(models.LearningObjective).join(models.LearningObjective.rubric_levels).filter(
+        models.LearningObjective.status == "approved",
+        models.RubricLevel.status == "pending"
+    ).distinct().count()
+    pending_approvals = pending_objs + pending_rubs
 
     return {
         "level_distribution": level_dist,          # Para gráfico de pizza/barras
