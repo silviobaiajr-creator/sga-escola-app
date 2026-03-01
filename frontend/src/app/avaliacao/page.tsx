@@ -100,10 +100,18 @@ export default function AvaliacaoPage() {
         const cls = classes.find(c => c.class_name === selectedClass);
         if (!cls) return;
 
+        let yLvl = cls.year_level;
+        if (!yLvl) {
+            // Fallback para Extração do "Ano" a partir do Nome da Turma (Ex: EFUT07D -> 7) se a carga CSV falhou no BD.
+            const match = cls.class_name.match(/0?(\d)/);
+            if (match) yLvl = parseInt(match[1], 10);
+            else yLvl = 6; // Safety Fallback
+        }
+
         getObjectives({
             bncc_code: "_all",
             discipline_id: selectedDisc,
-            year_level: cls.year_level,
+            year_level: yLvl,
             bimester: fetchPastBimesters ? undefined : selectedBimester,
         }).then(r => {
             const allObjs = r.data || [];
