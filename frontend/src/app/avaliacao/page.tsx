@@ -130,7 +130,6 @@ export default function AvaliacaoPage() {
                 }
             });
 
-            // Filtrar apenas habilidades onde TUDO foi aprovado
             const validSkills = Object.values(skillsMap).filter((sk: any) => skillStatusMap[sk.bncc_code] === true);
 
             // Fazer a checagem manual de bimestres passados (tratando strings/nums)
@@ -139,9 +138,20 @@ export default function AvaliacaoPage() {
                 : validSkills.filter((sk: any) => sk.bimester === selectedBimester);
 
             setSkills(finalSkills);
-        }).catch(() => setSkills([]));
 
-        setSelectedSkill(null);
+            // Auto-selecionar a primeira habilidade validada para melhorar a UX
+            if (finalSkills.length > 0) {
+                setSelectedSkill((prev: any) => {
+                    if (prev && finalSkills.some((fs: any) => fs.bncc_code === prev.bncc_code)) return prev;
+                    return finalSkills[0];
+                });
+            } else {
+                setSelectedSkill(null);
+            }
+        }).catch(() => {
+            setSkills([]);
+            setSelectedSkill(null);
+        });
     }, [selectedDisc, selectedBimester, selectedClass, fetchPastBimesters, classes]);
 
     // Carregar alunos quando turma muda
