@@ -186,12 +186,15 @@ def list_objectives(
             "ai_explanation": r.ai_explanation,
             "bncc_code": r.bncc_code,
             "bncc_description": r.bncc_skill.skill_description if r.bncc_skill else "",
+            "bimester": r.bimester,
+            "year_level": r.year_level,
             "has_rubrics": has_rubrics,
             "rubrics_status": rubrics_status,
             "approvals": approvals,
             "required_teachers": required_teachers
         })
     return result
+
 
 
 @router.post("/objectives/generate")
