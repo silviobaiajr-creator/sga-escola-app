@@ -7,7 +7,7 @@ import {
     Loader2, ChevronUp, AlertTriangle, BookOpen, Filter,
     CheckSquare, Square
 } from "lucide-react";
-import { getClasses, getDisciplines, getBnccSkills, getStudents, getObjectives, getRubrics, api } from "@/lib/api";
+import { getClasses, getDisciplines, getBnccSkills, getStudents, getObjectives, getRubrics, getTeacherClass, api } from "@/lib/api";
 
 // ─────────────────────────────────────────
 // CONSTANTES
@@ -88,17 +88,42 @@ export default function AvaliacaoPage() {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
-    // Carregar listas base
+    // Carregar listas base e auto-selecionar turma/disciplina do professor
     useEffect(() => {
-        getClasses().then(r => setClasses(r.data)).catch(() => { });
-        getDisciplines().then(r => setDisciplines(r.data)).catch(() => { });
+        Promise.all([
+            getClasses().catch(() => ({ data: [] })),
+            getDisciplines().catch(() => ({ data: [] })),
+            getTeacherClass().catch(() => ({ data: [] })),
+        ]).then(([cRes, dRes, tcRes]) => {
+            const cList = cRes.data || [];
+            const dList = dRes.data || [];
+            const tcList: any[] = tcRes.data || [];
+
+            setClasses(cList);
+            setDisciplines(dList);
+
+            // Auto-selecionar com base nos vínculos do professor
+            if (tcList.length > 0) {
+                const firstLink = tcList[0];
+                const linkedClass = cList.find((c: any) => c.id === firstLink.class_id);
+                if (linkedClass) setSelectedClass(linkedClass.class_name);
+                if (firstLink.discipline_id) setSelectedDisc(String(firstLink.discipline_id));
+            } else if (cList.length > 0) {
+                setSelectedClass(cList[0].class_name);
+            }
+        });
     }, []);
 
     // Carregar habilidades APENAS com objetivos aprovados
+    // IMPORTANTE: depende de `classes` estar populado antes de rodar
     useEffect(() => {
-        if (!selectedDisc || !selectedClass) return;
+        if (!selectedDisc || !selectedClass || classes.length === 0) return;
         const cls = classes.find(c => c.class_name === selectedClass);
-        if (!cls) return;
+        if (!cls) {
+            console.warn("[Avaliação] Turma não encontrada no array classes:", selectedClass, classes.map((c: any) => c.class_name));
+            return;
+        }
+
 
         let yLvl = cls.year_level;
         if (!yLvl) {
