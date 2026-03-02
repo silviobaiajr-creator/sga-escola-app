@@ -102,22 +102,33 @@ export default function AvaliacaoPage() {
 
         let yLvl = cls.year_level;
         if (!yLvl) {
-            // Fallback para Extração do "Ano" a partir do Nome da Turma (Ex: EFUT07D -> 7) se a carga CSV falhou no BD.
+            // Fallback para extração do "Ano" a partir do Nome da Turma (Ex: EFUT07D -> 7)
             const match = cls.class_name.match(/0?(\d)/);
             if (match) yLvl = parseInt(match[1], 10);
-            else yLvl = 6; // Safety Fallback
+            else yLvl = 6;
         }
 
-        getObjectives({
+        // Sempre passar bimester como número - nunca undefined (causaria 422 no backend)
+        const params: Record<string, any> = {
             bncc_code: "_all",
             discipline_id: selectedDisc,
             year_level: yLvl,
-            bimester: fetchPastBimesters ? undefined : selectedBimester,
-        }).then(r => {
+            bimester: selectedBimester,
+        };
+
+        // Quando buscando bimestres anteriores, omitir o filtro de bimester
+        if (fetchPastBimesters) {
+            delete params.bimester;
+        }
+
+        console.log("[Avaliação] Buscando objetivos com params:", params);
+
+        getObjectives(params).then(r => {
             const allObjs = r.data || [];
+            console.log("[Avaliação] Objetivos retornados:", allObjs.length, allObjs.map((o: any) => ({ bncc: o.bncc_code, status: o.status, rubrics: o.rubrics_status, bimester: o.bimester })));
 
             // Agrupar por habilidade e validar se TODAS as rubricas/objetivos daquela habilidade estão aprovados
-            const skillStatusMap: Record<string, boolean> = {}; // true se tudo aprovado
+            const skillStatusMap: Record<string, boolean> = {};
             const skillsMap: Record<string, any> = {};
 
             allObjs.forEach((o: any) => {
@@ -138,12 +149,17 @@ export default function AvaliacaoPage() {
                 }
             });
 
+            console.log("[Avaliação] skillStatusMap:", skillStatusMap);
+
             const validSkills = Object.values(skillsMap).filter((sk: any) => skillStatusMap[sk.bncc_code] === true);
+            console.log("[Avaliação] validSkills:", validSkills);
 
             // Fazer a checagem manual de bimestres passados (tratando strings/nums)
             const finalSkills = fetchPastBimesters
                 ? validSkills.filter((sk: any) => sk.bimester <= selectedBimester)
                 : validSkills.filter((sk: any) => sk.bimester === selectedBimester);
+
+            console.log("[Avaliação] finalSkills:", finalSkills);
 
             setSkills(finalSkills);
 
@@ -156,11 +172,13 @@ export default function AvaliacaoPage() {
             } else {
                 setSelectedSkill(null);
             }
-        }).catch(() => {
+        }).catch((err: any) => {
+            console.error("[Avaliação] Erro ao buscar objetivos:", err?.response?.status, err?.response?.data);
             setSkills([]);
             setSelectedSkill(null);
         });
     }, [selectedDisc, selectedBimester, selectedClass, fetchPastBimesters, classes]);
+
 
     // Carregar alunos quando turma muda
     useEffect(() => {
